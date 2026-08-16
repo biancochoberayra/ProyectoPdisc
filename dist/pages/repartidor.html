@@ -9,7 +9,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
       .vender-container {
@@ -149,13 +149,12 @@
           justify-content: flex-start;
         }
       }
-    </style>
-    <script type="module" crossorigin src="/assets/repartidor-Dmo43Gzy.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/speed-insights-D2W7XY-7.js">
-    <link rel="modulepreload" crossorigin href="/assets/nav-utils-CTwQwWss.js">
-    <link rel="modulepreload" crossorigin href="/assets/reviews-utils-D76XA-f2.js">
-    <link rel="modulepreload" crossorigin href="/assets/support-utils-CfSWH_Wa.js">
-    <link rel="modulepreload" crossorigin href="/assets/validation-utils-BzZAHDfL.js">
+    </style>
+    <script type="module" crossorigin src="/assets/repartidor-CSJaK3--.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/speed-insights-BfAoLf6m.js">
+    <link rel="modulepreload" crossorigin href="/assets/nav-utils-D7D42e1s.js">
+    <link rel="modulepreload" crossorigin href="/assets/reviews-utils-kBUixdgf.js">
+    <link rel="modulepreload" crossorigin href="/assets/support-utils-Cf9az3ec.js">
     <link rel="stylesheet" crossorigin href="/assets/auth-CDmIpMD7.css">
     <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
   </head>
@@ -188,61 +187,30 @@
       <main>
         <div class="vender-container">
 
-          <!-- Vista de Registro -->
-          <div id="register-view">
-            <div class="vender-header">
-              <h1>Sumate como repartidor</h1>
-              <p>Completá tus datos de contacto y vehículo. El equipo de Baradero Local revisa cada solicitud.</p>
-            </div>
-            <form id="delivery-form">
-              <div class="form-group">
-                <label class="form-label" for="delivery-name">Nombre completo</label>
-                <input type="text" id="delivery-name" class="form-input" placeholder="Nombre y apellido" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="delivery-phone">Teléfono de Contacto</label>
-                <input type="text" id="delivery-phone" class="form-input" placeholder="Código de área + Número" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="delivery-vehicle-type">Vehículo</label>
-                <select id="delivery-vehicle-type" class="form-input" required>
-                  <option value="bicicleta">Bicicleta</option>
-                  <option value="moto">Moto</option>
-                  <option value="auto">Auto</option>
-                </select>
-              </div>
-              <div class="form-group" id="delivery-plate-group">
-                <label class="form-label" for="delivery-plate">Patente</label>
-                <input type="text" id="delivery-plate" class="form-input" placeholder="Ej: AB123CD" />
-              </div>
-              <button type="submit" class="form-btn">Enviar solicitud</button>
-            </form>
-          </div>
+          <!-- El formulario de auto-postulación ("Sumate como repartidor") se
+               eliminó con el modelo de logística de terceros: al cadete lo da
+               de alta su operador por email (add_courier). Sin puerta de
+               entrada pública, no hay nada que un cliente común pueda hacer
+               acá. Ver db/schema/64_close_delivery_access.sql. -->
 
-          <!-- Vista de estado (pendiente / rechazada) -->
+          <!-- Vista de estado: sin alta de cadete / pausado / operador suspendido -->
           <div id="status-view">
-            <i class="fa-regular fa-clock" id="status-icon"></i>
+            <i class="fa-solid fa-circle-info" id="status-icon"></i>
             <div class="vender-header">
-              <h1 id="status-title">Solicitud en revisión</h1>
-              <p id="status-text">Te avisamos apenas el equipo la revise.</p>
+              <h1 id="status-title">No estás dado de alta como cadete</h1>
+              <p id="status-text">Para repartir tenés que estar dado de alta por un operador logístico o por el comercio con el que trabajás.</p>
             </div>
             <button type="button" class="btn-outline" id="btn-back-home">Volver al inicio</button>
           </div>
 
-          <!-- Panel del repartidor ya aprobado -->
+          <!-- Panel del cadete dado de alta -->
           <div id="dashboard-view">
             <div class="vender-header">
-              <h1>Panel de Repartidor</h1>
-              <p>Elegí un pedido disponible para repartir.</p>
+              <h1>Mis entregas</h1>
+              <p id="courier-provider"></p>
               <p id="repartidor-rating" style="font-weight: 600; margin-top: 0.25rem;"></p>
             </div>
 
-            <h2 class="delivery-section-title">Pedidos disponibles</h2>
-            <div id="available-orders-container" class="delivery-list">
-              <!-- Cargado con JS -->
-            </div>
-
-            <h2 class="delivery-section-title" style="margin-top: 2rem;">Mis entregas</h2>
             <div id="my-deliveries-container" class="delivery-list">
               <!-- Cargado con JS -->
             </div>
@@ -259,6 +227,6 @@
       <!-- Notificación Toast -->
       <div class="toast" id="toast" aria-live="polite" role="status"></div>
     </div>
-
+
   </body>
 </html>

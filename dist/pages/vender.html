@@ -9,7 +9,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
       /* F5-09: acento propio del "modo vendedor" — un tono más saturado y
@@ -462,12 +462,54 @@
         .pub-row__cell { min-width: 0; flex: 1 1 auto; align-items: flex-start; text-align: left; }
         .pub-count { margin-left: 0; width: 100%; }
       }
-    </style>
-    <script type="module" crossorigin src="/assets/vender-ChKC9Z1G.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/speed-insights-D2W7XY-7.js">
-    <link rel="modulepreload" crossorigin href="/assets/nav-utils-CTwQwWss.js">
-    <link rel="modulepreload" crossorigin href="/assets/support-utils-CfSWH_Wa.js">
-    <link rel="modulepreload" crossorigin href="/assets/validation-utils-BzZAHDfL.js">
+
+      /* Logística de terceros: sección "Mis cadetes". Las mismas clases que
+         usan repartidor.html y logistica.html, porque las tres pantallas las
+         pinta el mismo módulo (js/dispatch-utils.js). */
+      .delivery-section-title {
+        font-size: 1.125rem;
+        color: var(--bl-text);
+        margin-bottom: 0.75rem;
+      }
+      .delivery-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .delivery-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--bl-border);
+        border-radius: var(--bl-radius-md);
+        background: var(--bl-surface-alt);
+      }
+      .delivery-card__info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .delivery-card__store { font-weight: 600; }
+      .delivery-card__address {
+        font-size: 0.875rem;
+        color: var(--bl-text-secondary);
+      }
+      .delivery-empty {
+        color: var(--bl-text-secondary);
+        font-size: 0.9375rem;
+      }
+      @media (max-width: 768px) {
+        .delivery-card { justify-content: flex-start; }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/vender-D3jaQOWK.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/speed-insights-BfAoLf6m.js">
+    <link rel="modulepreload" crossorigin href="/assets/nav-utils-D7D42e1s.js">
+    <link rel="modulepreload" crossorigin href="/assets/dispatch-utils-cOc6YWNN.js">
+    <link rel="modulepreload" crossorigin href="/assets/support-utils-Cf9az3ec.js">
     <link rel="stylesheet" crossorigin href="/assets/auth-CDmIpMD7.css">
     <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
   </head>
@@ -560,6 +602,7 @@
                 <button type="button" class="mc-navitem" data-section="envios">Envíos en curso</button>
                 <button type="button" class="mc-navitem mc-navitem--owner" data-section="cupones">Mis cupones</button>
                 <button type="button" class="mc-navitem mc-navitem--owner" data-section="empleados">Empleados</button>
+                <button type="button" class="mc-navitem mc-navitem--owner" data-section="cadetes">Mis cadetes</button>
                 <button type="button" class="mc-navitem mc-navitem--owner" data-section="perfil-comercio">Perfil de mi comercio</button>
                 <button type="button" class="mc-navitem" data-section="notificaciones">Notificaciones</button>
                 <button type="button" class="mc-navitem" data-section="soporte">Soporte</button>
@@ -718,6 +761,37 @@
                 <button type="submit" class="form-btn" style="width: auto; padding: 0.75rem 1.5rem;">Agregar</button>
               </form>
               <div id="store-staff-container" class="pub-list"></div>
+            </div>
+            </section>
+
+            <!-- === Mis cadetes (logística de terceros) === -->
+            <!-- Un comercio que reparte con gente propia ES un operador logístico
+                 de kind='comercio' (db/schema/61_delivery_providers.sql). Las tres
+                 pantallas de acá abajo son las mismas que usa la cadetería externa
+                 en logistica.html -- se montan desde js/dispatch-utils.js.
+                 Oculto para empleados: dar de alta cadetes es decisión del dueño,
+                 mismo criterio que Empleados y Cupones (F12-16). -->
+            <section class="mc-section" data-section="cadetes" hidden>
+            <div class="pub-wrap" id="store-couriers-section">
+              <div class="pub-header"><h1 class="pub-title">Mis cadetes</h1></div>
+              <p style="color: var(--bl-text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                Gestioná tu propia gente de reparto. Los pedidos de tu comercio les quedan
+                reservados unos minutos antes de salir a la bolsa donde también los ven las
+                cadeterías externas.
+              </p>
+
+              <h2 class="delivery-section-title">Entregas en curso</h2>
+              <div id="store-active-deliveries" class="delivery-list" style="margin-bottom: 2rem;"></div>
+
+              <h2 class="delivery-section-title">Bolsa de pedidos</h2>
+              <p style="color: var(--bl-text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                Tus pedidos aparecen acá apenas se pagan. Pasada la reserva también vas a ver
+                pedidos de otros comercios que podés tomar.
+              </p>
+              <div id="store-delivery-pool" class="delivery-list" style="margin-bottom: 2rem;"></div>
+
+              <h2 class="delivery-section-title">Cadetes</h2>
+              <div id="store-couriers-container"></div>
             </div>
             </section>
 
@@ -956,6 +1030,6 @@
       <!-- Notificación Toast -->
       <div class="toast" id="toast" aria-live="polite" role="status"></div>
     </div>
-
+
   </body>
 </html>

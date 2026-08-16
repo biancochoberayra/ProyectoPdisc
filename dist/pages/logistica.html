@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="view-transition" content="same-origin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https://*.googleusercontent.com https://*.supabase.co; connect-src 'self' https://*.supabase.co https://accounts.google.com;">
+    <title>Panel de logística - Baradero Local</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+      .vender-container {
+        max-width: 960px;
+        margin: 3rem auto;
+        padding: 2rem;
+        background: var(--bl-surface);
+        border: 1px solid var(--bl-border);
+        border-radius: var(--bl-radius-xl);
+        box-shadow: var(--bl-shadow-lg);
+      }
+      .vender-header {
+        margin-bottom: 2rem;
+      }
+      .vender-header h1 {
+        font-size: 2rem;
+        color: var(--bl-primary-deeper);
+        margin-bottom: 0.5rem;
+      }
+      .vender-header p {
+        color: var(--bl-text-secondary);
+      }
+      .form-group { margin-bottom: 1.5rem; }
+      .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: var(--bl-text);
+      }
+      .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--bl-border);
+        border-radius: var(--bl-radius-md);
+        font-family: inherit;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+      }
+      .form-input:focus {
+        outline: none;
+        border-color: var(--bl-primary);
+        box-shadow: 0 0 0 2px rgba(40, 65, 117, 0.1);
+      }
+      .form-btn {
+        width: 100%;
+        padding: 1rem;
+        background: var(--bl-primary);
+        color: white;
+        border: none;
+        border-radius: var(--bl-radius-md);
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .form-btn:hover { background: var(--bl-primary-dark); }
+      .form-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+      .btn-outline {
+        padding: 0.5rem 1.25rem;
+        border: 2px solid var(--bl-primary);
+        color: var(--bl-primary);
+        border-radius: var(--bl-radius-md);
+        font-weight: 600;
+        cursor: pointer;
+        background: transparent;
+        transition: all 0.2s;
+      }
+      .btn-outline:hover { background: var(--bl-primary); color: white; }
+      .btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
+
+      /* Navegación por secciones */
+      .lg-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--bl-border);
+        padding-bottom: 0.75rem;
+      }
+      .lg-navitem {
+        padding: 0.5rem 1rem;
+        border: none;
+        background: transparent;
+        border-radius: var(--bl-radius-md);
+        font-family: inherit;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--bl-text-secondary);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .lg-navitem:hover { background: var(--bl-surface-alt); }
+      .lg-navitem.is-active { background: var(--bl-primary); color: white; }
+      .lg-section { display: none; }
+      .lg-section.is-active { display: block; }
+
+      .delivery-section-title {
+        font-size: 1.25rem;
+        color: var(--bl-text);
+        margin-bottom: 1rem;
+      }
+      .delivery-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .delivery-card {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--bl-border);
+        border-radius: var(--bl-radius-md);
+        background: var(--bl-surface-alt);
+      }
+      .delivery-card__info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .delivery-card__store { font-weight: 600; }
+      .delivery-card__address {
+        font-size: 0.875rem;
+        color: var(--bl-text-secondary);
+      }
+      .delivery-empty {
+        color: var(--bl-text-secondary);
+        font-size: 0.9375rem;
+      }
+
+      @media (max-width: 768px) {
+        .vender-container {
+          margin: 1rem auto;
+          padding: 1.25rem;
+          border-radius: var(--bl-radius-lg);
+        }
+        .vender-header h1 { font-size: 1.5rem; }
+        .delivery-card { justify-content: flex-start; }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/logistica-C1S0l-Q1.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/speed-insights-BfAoLf6m.js">
+    <link rel="modulepreload" crossorigin href="/assets/nav-utils-D7D42e1s.js">
+    <link rel="modulepreload" crossorigin href="/assets/dispatch-utils-cOc6YWNN.js">
+    <link rel="modulepreload" crossorigin href="/assets/support-utils-Cf9az3ec.js">
+    <link rel="stylesheet" crossorigin href="/assets/auth-CDmIpMD7.css">
+    <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
+  </head>
+  <body>
+    <!-- Loading screen -->
+    <div id="loading-screen" class="auth-loading-screen">
+      <div class="auth-loading-spinner"></div>
+      <span class="auth-loading-text">Verificando sesión...</span>
+    </div>
+
+    <!-- Contenido principal -->
+    <div id="main-content">
+      <nav class="navbar">
+        <div class="navbar__top">
+          <a href="./home.html" class="navbar__logo">
+            <img src="/assets/logoazulpng-BmcneNO6.png" alt="Baradero Local" class="navbar__logo-img" />
+            <div class="navbar__logo-text">
+              <span class="navbar__logo-title">Baradero Local</span>
+              <span class="navbar__logo-subtitle">Baradero, más cerca que nunca</span>
+            </div>
+          </a>
+          <div class="navbar__actions">
+            <div id="nav-notifications-wrap"></div>
+            <script>(function(){try{var w=document.getElementById('nav-notifications-wrap');if(w){var b=document.createElement('button');b.type='button';b.className='navbar__action-circle';b.id='nav-notifications';b.setAttribute('aria-label','Notificaciones');var i=document.createElement('i');i.className='fa-regular fa-bell';i.style.fontSize='0.875rem';b.appendChild(i);var s=document.createElement('span');s.className='cart-badge';s.id='notif-badge';b.appendChild(s);w.appendChild(b);}}catch(e){}})();</script>
+            <a href="./home.html" class="navbar__action-circle" aria-label="Volver"><i class="fa-solid fa-arrow-left"></i></a>
+          </div>
+        </div>
+      </nav>
+
+      <main>
+        <div class="vender-container">
+
+          <!-- Estado: la cuenta no tiene operador asociado -->
+          <div id="status-view" style="display: none; text-align: center;">
+            <i class="fa-solid fa-circle-exclamation" id="status-icon" style="font-size: 3rem; color: var(--bl-primary); margin-bottom: 1rem;"></i>
+            <div class="vender-header">
+              <h1 id="status-title">Sin operador asignado</h1>
+              <p id="status-text">Esta cuenta no está vinculada a ningún operador logístico.</p>
+            </div>
+            <button type="button" class="btn-outline" id="btn-back-home">Volver al inicio</button>
+          </div>
+
+          <!-- Panel del operador -->
+          <div id="dashboard-view" style="display: none;">
+            <div class="vender-header">
+              <h1 id="provider-name">Panel de logística</h1>
+              <p id="provider-meta"></p>
+            </div>
+
+            <div class="lg-nav" role="tablist">
+              <button type="button" class="lg-navitem is-active" data-section="bolsa">Bolsa de pedidos</button>
+              <button type="button" class="lg-navitem" data-section="curso">Entregas en curso</button>
+              <button type="button" class="lg-navitem" data-section="cadetes">Mis cadetes</button>
+              <button type="button" class="lg-navitem" data-section="datos">Datos del operador</button>
+              <button type="button" class="lg-navitem" data-section="notificaciones">Notificaciones</button>
+              <button type="button" class="lg-navitem" data-section="soporte">Soporte</button>
+            </div>
+
+            <section class="lg-section is-active" data-section="bolsa">
+              <h2 class="delivery-section-title">Pedidos disponibles</h2>
+              <p class="delivery-empty" style="margin-bottom: 1rem;">
+                Pedidos pagados esperando quién los lleve. La dirección exacta y el teléfono del cliente
+                aparecen recién cuando tomás el pedido.
+              </p>
+              <div id="pool-container" class="delivery-list"></div>
+            </section>
+
+            <section class="lg-section" data-section="curso">
+              <h2 class="delivery-section-title">Entregas en curso</h2>
+              <div id="active-container" class="delivery-list"></div>
+            </section>
+
+            <section class="lg-section" data-section="cadetes">
+              <h2 class="delivery-section-title">Mis cadetes</h2>
+              <div id="couriers-container"></div>
+            </section>
+
+            <section class="lg-section" data-section="datos">
+              <h2 class="delivery-section-title">Datos del operador</h2>
+              <form id="provider-form">
+                <div class="form-group">
+                  <label class="form-label" for="provider-contact">Persona de contacto</label>
+                  <input type="text" id="provider-contact" class="form-input" placeholder="Nombre y apellido" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="provider-phone">Teléfono</label>
+                  <input type="text" id="provider-phone" class="form-input" placeholder="Código de área + Número" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="provider-coverage">Zona de cobertura y horarios</label>
+                  <textarea id="provider-coverage" class="form-input" rows="4" placeholder="Ej: todo Baradero centro, lunes a sábado de 9 a 20."></textarea>
+                </div>
+                <button type="submit" class="form-btn">Guardar cambios</button>
+              </form>
+            </section>
+
+            <section class="lg-section" data-section="notificaciones">
+              <h2 class="delivery-section-title">Notificaciones</h2>
+              <div id="notifications-container"></div>
+            </section>
+
+            <section class="lg-section" data-section="soporte">
+              <h2 class="delivery-section-title">Soporte</h2>
+              <div id="support-container"></div>
+            </section>
+          </div>
+
+        </div>
+      </main>
+
+      <!-- Notificación Toast -->
+      <div class="toast" id="toast" aria-live="polite" role="status"></div>
+    </div>
+
+  </body>
+</html>
