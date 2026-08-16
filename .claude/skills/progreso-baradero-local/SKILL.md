@@ -76,14 +76,27 @@ despachando NO necesita rol nuevo — se resuelve con el chequeo de ownership de
 - Docs actualizados: README, terminos.html (cláusulas 3 y 5 — ahora son **cinco** tipos de cuenta),
   MIGRACIONES_PENDIENTES.md, CLAUDE.md.
 
-### ⚠️ Lo que NO se verificó (importante antes de retomar)
-La máquina de esa sesión **no tenía Node instalado** (`npm`/`node` fuera del PATH), así que
-**no se pudo correr `npm run build`** ni levantar el dev server. Y sin credenciales de Supabase,
-**las cinco migraciones quedaron sin aplicar**. Lo único que se hizo fue un chequeo de balance de
-llaves/paréntesis por archivo. Antes de mergear: build, aplicar migraciones en orden, y probar el
-flujo completo (alta de cadetería → alta de cadete → pago de un pedido → bolsa → claim → asignar →
-avanzar estados), más el caso negativo: entrar con una cuenta cliente a `/pages/logistica.html`
-y a `/pages/repartidor.html`.
+### Verificación
+La máquina de esa sesión no tenía Node instalado; se instaló (24.19.0 / npm 11.17.0, vía winget)
+y con eso se pudo verificar:
+- **`npm run build` pasa sin warnings ni errores.** Entran al bundle `pages/logistica.html`,
+  `assets/logistica-*.js` y `assets/dispatch-utils-*.js`. `dist/` regenerado y commiteado
+  (en este repo `dist/` se versiona).
+- **Dev server (`--port 5188`)**: `logistica.html` y `repartidor.html` rebotan a login sin ningún
+  error de módulo/import/sintaxis en consola — o sea, `guardPage` corre y la cadena de imports
+  resuelve. El único error de consola es el de Vercel Speed Insights bloqueado por CSP, que es
+  **preexistente y aparece en todas las páginas del proyecto**, no lo introdujo este cambio.
+- **Home**: cero links a `repartidor.html`/`logistica.html` (verificado por DOM, no a ojo).
+
+### ⚠️ Lo que sigue SIN verificar (antes de mergear)
+- **Las cinco migraciones no se aplicaron** — no hay credenciales de Supabase en esa máquina.
+- **El gate de `requireRole` no se ejerció de verdad**: sin sesión, `guardPage` corta antes por la
+  rama de `requireAuth`. Falta el caso que importa — entrar **logueado como cliente** a
+  `/pages/logistica.html` y `/pages/repartidor.html` y confirmar el rebote a home.
+- Falta el flujo completo: alta de cadetería → alta de cadete → pago de un pedido → bolsa →
+  claim → asignar → avanzar estados.
+- El `.env` local se creó con la URL real del proyecto pero **anon key placeholder**, así que
+  ninguna llamada a Supabase se ejecutó de verdad.
 
 ## Rediseño del alta de producto (panel vendedor) (2026-08-14)
 Rama `rediseno-publicar-producto`. El usuario reportó que "la pestaña cuando el vendedor sube un

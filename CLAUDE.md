@@ -85,9 +85,13 @@ Historial completo de cómo se llegó a cada uno: skill `progreso-baradero-local
   migraciones nuevas (61-65) **pendientes de aplicar** — ver `docs/MIGRACIONES_PENDIENTES.md`,
   que documenta el orden y las dos trampas (la 62 va en su propia transacción; la 65 necesita
   una cuenta admin). **No mergear a `main` hasta aplicarlas y probar el flujo completo**: cada
-  push a `main` deploya a producción, y la 64 cambia RLS de `orders`. Nada de esto se pudo
-  probar en la sesión que lo escribió (sin Node instalado en esa máquina → sin `npm run build`,
-  y sin credenciales de Supabase → sin aplicar migraciones).
+  push a `main` deploya a producción, y la 64 cambia RLS de `orders`.
+  **Verificado** (misma sesión, tras instalar Node 24.19): `npm run build` pasa sin warnings ni
+  errores, `dist/` regenerado y commiteado, y el dev server confirma que `logistica.html` y
+  `repartidor.html` rebotan a login sin errores de módulo y que el home ya no linkea a ninguna
+  de las dos. **Falta**: aplicar las migraciones (sin credenciales de Supabase en esta máquina)
+  y probar el flujo con sesiones reales de cada rol — el gate de `requireRole` sólo se ejerció
+  por la rama de `requireAuth` (visitante sin sesión), no con una cuenta cliente logueada.
 - **Rol `admin` en producción, ahora bloqueante para logística.** Ya estaba pendiente (abajo),
   pero ahora tiene una consecuencia concreta: sin una cuenta admin no se puede dar de alta
   ninguna cadetería (`create_delivery_provider` exige rol admin) ni completar el bloque 1 de la
