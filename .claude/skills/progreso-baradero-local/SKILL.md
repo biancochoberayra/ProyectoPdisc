@@ -5,6 +5,86 @@ description: Historial detallado de todas las fases completadas (F0 a F12) del p
 
 # Historial de fases — Baradero Local
 
+## Logística de terceros (2026-08-16) — rama `feature/logistica-terceros`, SIN mergear ni aplicar
+
+El usuario pidió "adaptar el apartado de repartidor a un modo de 3ros, donde se puedan gestionar
+estas cosas, pero que clientes comunes no puedan ingresar". Dos decisiones suyas al plantearle
+las opciones: (1) **mezcla de cadetería externa + comercio con cadetes propios** (no una sola de
+las dos), (2) **bolsa abierta entre operadores** (el primero que llega se lleva el pedido).
+
+### Qué estaba mal antes (el diagnóstico que motivó todo)
+Tres puertas abiertas, encontradas leyendo el código:
+1. `repartidor.html` usaba `guardPage({ requireAuth: true })` **sin `requireRole`** — cualquier
+   cliente logueado entraba. Y había link público "Sumate como repartidor" en el footer del home
+   y un quick-btn "Quiero repartir" en el perfil.
+2. `delivery_requests_insert_own` dejaba a cualquiera auto-postularse.
+3. **La grave**: `orders_select_repartidor` (migración 26) le daba a cualquier cuenta con rol
+   `repartidor` lectura de **todos los pedidos pagados con envío de toda la plataforma**,
+   dirección de entrega y total incluidos. Eso no se arregla escondiendo la página — es RLS.
+
+### Diseño elegido
+Una **sola** tabla de operadores con un `kind` (`externo` | `comercio`), en vez de dos entidades
+separadas. Un comercio que reparte con gente propia *es* un operador de `kind='comercio'`; misma
+tabla de cadetes, mismos RPCs, mismas policies, misma UI. El patrón entero (entidad + miembros
+dados de alta por email vía RPC, nunca auto-registro) es **copia deliberada de
+`stores` + `store_staff` + `add_store_staff`** (migración 49), que ya estaba probado.
+
+Rol nuevo: **uno solo**, `operador_logistico` (despachante de cadetería externa). El comercio
+despachando NO necesita rol nuevo — se resuelve con el chequeo de ownership de siempre.
+
+### Migraciones 61-65
+- **61** `delivery_providers` + `delivery_couriers` + `my_delivery_provider_ids()` (SECURITY
+  DEFINER para evitar recursión de policies) + `add_courier` / `remove_courier` /
+  `ensure_store_provider` (idempotente). Trigger `freeze_delivery_provider_admin_columns`:
+  el dueño edita contacto/cobertura pero NO `kind`/`store_id`/`owner_id`/`cuit`/`is_active`
+  (si no, un operador suspendido se reactiva solo). `add_courier` respeta los dos aprendizajes
+  ya pagados: `set_config('app.role_change_authorized')` (mig. 24) y no pisar rol elevado (mig. 53).
+- **62** rol `operador_logistico` (va al enum `app_role`, a diferencia de `moderador`, porque lo
+  asigna un flujo de la app) + `create_delivery_provider` (admin, CUIT validado) +
+  `admin_set_provider_active`.
+- **63** dos pasos en vez de uno: `claim_delivery_as_provider` (la empresa toma) →
+  `assign_delivery` (el despachante elige cadete). Estado nuevo `claimed`.
+  **`claim_delivery` (la auto-asignación del cadete) se DROPEA** — era la puerta de atrás.
+  Trigger `open_delivery_on_paid` sobre `orders`: la fila de `deliveries` ahora nace con el pago
+  (cubre los tres caminos —simulado, transferencia, webhook MP— sin tocar ninguno).
+- **64** el cierre: drop de `delivery_requests_insert_own`, reemplazo de `orders_select_repartidor`
+  por dos policies acotadas, `deliveries_select_participants` más estrecha, y `list_delivery_pool()`.
+- **65** puente: operador "Baradero Local — equipo propio" que hereda los repartidores viejos.
+
+### Decisiones que conviene recordar
+- **Ventana de prioridad de casa** (`pool_opens_at` + `priority_window_minutes`, default 10).
+  Sin esto, la mezcla que pidió el usuario le sacaría al comerciante los envíos que quería hacer
+  con su propia gente. No necesita cron: es un timestamp que las queries comparan contra `now()`.
+  El usuario no objetó el default de 10 min cuando se lo planteé como supuesto.
+- **La bolsa muestra datos recortados.** `list_delivery_pool` devuelve comercio, total, cantidad
+  de ítems y una pista de zona (la calle **sin altura**, `regexp_replace` de los dígitos). La
+  dirección completa y el teléfono se destapan al reclamar. Mejora de privacidad aprovechando el
+  rediseño — antes cualquier repartidor veía la dirección exacta de todos los pedidos.
+- **Se descartó** una policy que dejara a los vendedores listar las cadeterías activas: con bolsa
+  abierta ninguna pantalla la necesita, y expondría CUIT/contacto a cualquier cuenta logueada.
+  Al sacarla apareció un bug propio: `fetchMyProvider()` usaba `maybeSingle()` sin filtrar por
+  `owner_id` — para un admin (que ve todas las filas) hubiera reventado. Ahora filtra explícito.
+
+### Frontend
+- `js/dispatch-utils.js` (nuevo): las tres pantallas (bolsa / en curso / cadetes) escritas una vez.
+- `pages/logistica.html` + `js/logistica.js` (nuevos): panel de la cadetería externa.
+- `js/repartidor.js` **reescrito**: sin formulario de auto-postulación, sin bolsa. El cadete solo
+  ve lo asignado. `checkDeliveryState` → `checkCourierState` (la pregunta ya no es "¿tu solicitud
+  está aprobada?" sino "¿algún operador te dio de alta?").
+- `vender.html`/`vender.js`: sección "Mis cadetes" (owner-only, junto a Empleados y Cupones).
+- `admin.html`/`admin.js`: sección "Operadores" + `providers` agregado a `MODERADOR_HIDDEN_SECTIONS`.
+- Docs actualizados: README, terminos.html (cláusulas 3 y 5 — ahora son **cinco** tipos de cuenta),
+  MIGRACIONES_PENDIENTES.md, CLAUDE.md.
+
+### ⚠️ Lo que NO se verificó (importante antes de retomar)
+La máquina de esa sesión **no tenía Node instalado** (`npm`/`node` fuera del PATH), así que
+**no se pudo correr `npm run build`** ni levantar el dev server. Y sin credenciales de Supabase,
+**las cinco migraciones quedaron sin aplicar**. Lo único que se hizo fue un chequeo de balance de
+llaves/paréntesis por archivo. Antes de mergear: build, aplicar migraciones en orden, y probar el
+flujo completo (alta de cadetería → alta de cadete → pago de un pedido → bolsa → claim → asignar →
+avanzar estados), más el caso negativo: entrar con una cuenta cliente a `/pages/logistica.html`
+y a `/pages/repartidor.html`.
+
 ## Rediseño del alta de producto (panel vendedor) (2026-08-14)
 Rama `rediseno-publicar-producto`. El usuario reportó que "la pestaña cuando el vendedor sube un
 producto está muy verde" y pidió rediseñarla entera, con plan previo. Tres decisiones suyas al

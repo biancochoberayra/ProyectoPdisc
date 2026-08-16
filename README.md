@@ -22,13 +22,15 @@
 - Gestión de pedidos (pickup/delivery), confirmación de pagos por transferencia.
 - Estadísticas del día/mes, perfil de tienda (zona, horarios, descripción).
 
-**Repartidor**
-- Alta con aprobación manual del admin.
-- Toma de pedidos disponibles y actualización de estado (asignado → en camino → entregado).
+**Logística (terceros)**
+- **Operador logístico**: cadetería externa habilitada por el admin (CUIT validado). Panel propio con bolsa de pedidos, entregas en curso y alta/baja de sus cadetes.
+- **Comercio con cadetes propios**: el vendedor gestiona su propia gente desde "Mis cadetes", con reserva de sus pedidos antes de que salgan a la bolsa.
+- **Cadete**: sólo ve las entregas que le asignó su despachante, y avanza el estado (asignado → en camino → entregado).
+- Sin auto-registro: al cadete lo da de alta su operador por email. No hay puerta de entrada pública.
 
 **Admin**
-- Aprobación de comercios y repartidores (CUIT validado).
-- Moderación de productos/comercios/reseñas, CRUD de categorías y cupones.
+- Aprobación de comercios (CUIT validado) y alta/suspensión de operadores logísticos.
+- Moderación de productos/comercios/repartidores/reseñas, CRUD de categorías y cupones.
 - Métricas globales (usuarios, ventas, entregas).
 
 ---

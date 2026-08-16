@@ -57,6 +57,9 @@
               <button type="button" class="admin-nav__item" data-target="delivery-requests">
                 <i class="fa-solid fa-motorcycle" aria-hidden="true"></i><span>Repartidores</span>
               </button>
+              <button type="button" class="admin-nav__item" data-target="providers">
+                <i class="fa-solid fa-truck-ramp-box" aria-hidden="true"></i><span>Operadores</span>
+              </button>
             </div>
 
             <div class="admin-nav__group">
@@ -364,6 +367,64 @@
                         </tr>
                       </thead>
                       <tbody id="repartidores-mod-tbody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+
+              <!-- ===== Operadores logísticos ===== -->
+              <!-- Logística de terceros: única puerta de entrada de una cadetería
+                   externa al sistema. No hay auto-registro ni tabla de solicitudes
+                   -- el admin da de alta acá, con CUIT validado, y eso promueve la
+                   cuenta a rol 'operador_logistico'. Ver
+                   db/schema/62_operador_logistico_role.sql -->
+              <section class="admin-section" data-section="providers">
+                <div class="admin-section__head">
+                  <div>
+                    <h2 class="admin-section__title">Operadores logísticos</h2>
+                    <p class="admin-section__subtitle">Cadeterías externas habilitadas a tomar entregas. Los comercios que reparten con gente propia se dan de alta solos desde su panel y aparecen acá como tipo "Comercio".</p>
+                  </div>
+                  <button class="admin-btn admin-btn--ghost" id="btn-refresh-providers"><i class="fa-solid fa-rotate-right"></i> Refrescar</button>
+                </div>
+
+                <form class="admin-inline-form" id="provider-create-form">
+                  <div class="form-group">
+                    <label for="provider-new-email">Email del responsable</label>
+                    <input type="email" id="provider-new-email" placeholder="responsable@email.com" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="provider-new-name">Nombre de la cadetería</label>
+                    <input type="text" id="provider-new-name" placeholder="Ej: Cadetería del Centro" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="provider-new-cuit">CUIT</label>
+                    <input type="text" id="provider-new-cuit" placeholder="20-12345678-9" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="provider-new-phone">Teléfono</label>
+                    <input type="text" id="provider-new-phone" placeholder="Cód. área + Número" />
+                  </div>
+                  <div class="form-group">
+                    <label for="provider-new-contact">Contacto</label>
+                    <input type="text" id="provider-new-contact" placeholder="Nombre y apellido" />
+                  </div>
+                  <button type="submit" class="action-btn btn-approve"><i class="fa-solid fa-plus"></i> Dar de alta</button>
+                </form>
+
+                <div class="admin-card">
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Nombre</th>
+                          <th>Tipo</th>
+                          <th>Contacto</th>
+                          <th>Cadetes</th>
+                          <th>Estado</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody id="providers-tbody"></tbody>
                     </table>
                   </div>
                 </div>

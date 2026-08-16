@@ -151,9 +151,17 @@
                 <i class="fa-solid fa-shop"></i>
                 Quiero vender
               </a>
-              <a href="./repartidor.html" class="quick-btn">
+              <!-- "Quiero repartir" se quitó con el modelo de logística de
+                   terceros: repartidor.html dejó de ser una página de alta
+                   pública y ahora exige rol. Un cliente que la viera acá se
+                   comería un rebote a home. -->
+              <a href="./repartidor.html" class="quick-btn" id="quick-btn-repartidor" style="display: none;">
                 <i class="fa-solid fa-truck-fast"></i>
-                Quiero repartir
+                Mis entregas
+              </a>
+              <a href="./logistica.html" class="quick-btn" id="quick-btn-logistica" style="display: none;">
+                <i class="fa-solid fa-truck-ramp-box"></i>
+                Panel de logística
               </a>
             </div>
           </article>

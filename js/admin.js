@@ -863,6 +863,119 @@ async function handleProofDecisionAdmin(proofId, approve) {
   fetchPendingProofsAdmin();
 }
 
+// --- Logística de terceros: operadores (cadeterías externas + comercios) ---
+//
+// Única puerta de entrada de un tercero al sistema de reparto: no hay
+// auto-registro ni tabla de solicitudes (ese flujo se cerró en
+// 64_close_delivery_access.sql). Los de kind='comercio' se listan pero no se
+// crean acá -- los crea el propio dueño desde vender.html.
+async function fetchProviders() {
+  const tbody = document.getElementById('providers-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Cargando operadores...</td></tr>';
+
+  const { data, error } = await supabase
+    .from('delivery_providers')
+    .select('id, kind, name, cuit, phone, contact_name, is_active, delivery_couriers ( id, is_active )')
+    .order('kind')
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching delivery providers:', error);
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444;">Error al cargar los operadores.</td></tr>';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay operadores logísticos todavía.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.forEach((provider) => {
+    const tr = document.createElement('tr');
+
+    const tdName = document.createElement('td');
+    tdName.textContent = provider.name;
+    tr.appendChild(tdName);
+
+    const tdKind = document.createElement('td');
+    tdKind.textContent = provider.kind === 'externo' ? 'Cadetería' : 'Comercio';
+    tr.appendChild(tdKind);
+
+    const tdContact = document.createElement('td');
+    tdContact.textContent = [provider.contact_name, provider.phone].filter(Boolean).join(' · ') || '-';
+    tr.appendChild(tdContact);
+
+    const tdCouriers = document.createElement('td');
+    const couriers = provider.delivery_couriers || [];
+    const activeCouriers = couriers.filter((c) => c.is_active).length;
+    tdCouriers.textContent = `${activeCouriers} activo${activeCouriers === 1 ? '' : 's'} / ${couriers.length}`;
+    tr.appendChild(tdCouriers);
+
+    const tdStatus = document.createElement('td');
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `status-badge ${provider.is_active ? 'status-approved' : 'status-suspended'}`;
+    statusBadge.textContent = provider.is_active ? 'Activo' : 'Suspendido';
+    tdStatus.appendChild(statusBadge);
+    tr.appendChild(tdStatus);
+
+    const tdActions = document.createElement('td');
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = `action-btn ${provider.is_active ? 'btn-suspend' : 'btn-reactivate'}`;
+    toggleBtn.textContent = provider.is_active ? 'Suspender' : 'Reactivar';
+    toggleBtn.addEventListener('click', async () => {
+      if (!confirm(`¿${provider.is_active ? 'Suspender' : 'Reactivar'} a "${provider.name}"?`)) return;
+      const { error: rpcError } = await supabase.rpc('admin_set_provider_active', {
+        p_provider_id: provider.id,
+        p_is_active: !provider.is_active,
+      });
+      if (rpcError) {
+        showToast(rpcError.message || 'No se pudo actualizar el operador.', 'error');
+        console.error(rpcError);
+        return;
+      }
+      showToast(`Operador ${provider.is_active ? 'suspendido' : 'reactivado'}.`, 'success');
+      fetchProviders();
+    });
+    tdActions.appendChild(toggleBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function setupProviderCreateForm() {
+  const form = document.getElementById('provider-create-form');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    const { error } = await supabase.rpc('create_delivery_provider', {
+      p_email: document.getElementById('provider-new-email').value.trim(),
+      p_name: document.getElementById('provider-new-name').value.trim(),
+      p_cuit: document.getElementById('provider-new-cuit').value.trim(),
+      p_phone: document.getElementById('provider-new-phone').value.trim() || null,
+      p_contact_name: document.getElementById('provider-new-contact').value.trim() || null,
+      p_coverage_notes: null,
+    });
+
+    submitBtn.disabled = false;
+
+    if (error) {
+      console.error('Error al dar de alta el operador:', error);
+      showToast(error.message || 'No se pudo dar de alta el operador.', 'error');
+      return;
+    }
+
+    showToast('Operador dado de alta. La cuenta ya puede entrar a su panel de logística.', 'success');
+    form.reset();
+    fetchProviders();
+  });
+}
+
 // --- F7-03: moderación de reseñas reportadas ---
 
 async function fetchReportedReviews() {
@@ -1350,6 +1463,7 @@ const SECTION_LOADERS = {
   'metrics': loadGlobalMetrics,
   'seller-requests': fetchRequests,
   'delivery-requests': fetchDeliveryRequests,
+  'providers': fetchProviders,
   'categories': fetchCategories,
   'coupons': fetchCoupons,
   'stores-mod': fetchStoresForModeration,
@@ -1428,6 +1542,7 @@ function initAdminPage() {
 
   document.getElementById('btn-refresh').addEventListener('click', fetchRequests);
   document.getElementById('btn-refresh-delivery').addEventListener('click', fetchDeliveryRequests);
+  document.getElementById('btn-refresh-providers').addEventListener('click', fetchProviders);
   document.getElementById('btn-refresh-metrics').addEventListener('click', loadGlobalMetrics);
   document.getElementById('btn-refresh-categories').addEventListener('click', fetchCategories);
   document.getElementById('btn-refresh-coupons').addEventListener('click', fetchCoupons);
@@ -1442,6 +1557,7 @@ function initAdminPage() {
 
   setupCategoryForm();
   setupCouponForm();
+  setupProviderCreateForm();
   setupProductSearch();
   setupSectionNav();
 
@@ -1458,7 +1574,7 @@ function initAdminPage() {
 // oculta la UI que un moderador no puede usar, para que no vea opciones
 // que van a fallar.
 const MODERADOR_HIDDEN_SECTIONS = [
-  'seller-requests', 'delivery-requests', 'metrics', 'categories', 'coupons',
+  'seller-requests', 'delivery-requests', 'providers', 'metrics', 'categories', 'coupons',
   'stores-mod', 'products-mod', 'repartidores-mod', 'proofs',
   'revocations', 'error-logs', 'audit-log',
 ];

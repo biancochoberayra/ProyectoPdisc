@@ -5,6 +5,12 @@ import { renderNotificationsSection } from './notifications-utils.js';
 import { renderSupportSection } from './support-utils.js';
 import { initNotificationsBell } from './nav-utils.js';
 import { initVenderShell } from './vender-shell.js';
+import {
+  ensureStoreProvider,
+  renderPoolSection,
+  renderActiveDeliveriesSection,
+  renderCouriersSection,
+} from './dispatch-utils.js';
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
 // --- Verificar si es vendedor y mostrar la vista correcta ---
@@ -258,7 +264,7 @@ async function loadDashboard(user, staffStoreId) {
   if (welcomeStoreName) welcomeStoreName.textContent = store.name;
 
   // Secciones exclusivas del dueño -- un empleado no las ve.
-  ['store-profile-section', 'my-coupons-section', 'store-staff-section'].forEach((id) => {
+  ['store-profile-section', 'my-coupons-section', 'store-staff-section', 'store-couriers-section'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = isStoreOwner ? '' : 'none';
   });
@@ -306,8 +312,41 @@ async function loadDashboard(user, staffStoreId) {
   ]);
 
   if (isStoreOwner) {
-    await Promise.all([renderMyCoupons(), renderStoreStaff()]);
+    await Promise.all([renderMyCoupons(), renderStoreStaff(), renderStoreCouriers()]);
   }
+}
+
+// --- Logística de terceros: el comercio como operador de sus propios cadetes ---
+//
+// Un comercio que reparte con gente propia es, en el modelo nuevo, un
+// operador de kind='comercio' (61_delivery_providers.sql). Las tres pantallas
+// son exactamente las mismas que ve una cadetería externa en logistica.html;
+// viven en dispatch-utils.js para no escribirlas dos veces.
+let currentProviderId = null;
+
+async function renderStoreCouriers() {
+  const couriersContainer = document.getElementById('store-couriers-container');
+  const poolContainer = document.getElementById('store-delivery-pool');
+  const activeContainer = document.getElementById('store-active-deliveries');
+  if (!couriersContainer || !currentStoreId) return;
+
+  // Idempotente: crea el operador del comercio la primera vez y lo recupera
+  // después, así el dueño no tiene que "activar" nada a mano.
+  if (!currentProviderId) {
+    currentProviderId = await ensureStoreProvider(currentStoreId);
+  }
+  if (!currentProviderId) return;
+
+  const refresh = () => {
+    if (poolContainer) renderPoolSection(poolContainer, currentProviderId, null);
+    if (activeContainer) renderActiveDeliveriesSection(activeContainer, currentProviderId, null);
+  };
+
+  await Promise.all([
+    renderCouriersSection(couriersContainer, currentProviderId, refresh),
+    poolContainer ? renderPoolSection(poolContainer, currentProviderId, refresh) : null,
+    activeContainer ? renderActiveDeliveriesSection(activeContainer, currentProviderId, refresh) : null,
+  ]);
 }
 
 // --- F5-06: gestión de pedidos ---

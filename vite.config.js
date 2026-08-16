@@ -38,6 +38,7 @@ export default defineConfig({
         privacidad: resolve(__dirname, 'pages/privacidad.html'),
         info: resolve(__dirname, 'pages/info.html'),
         repartidor: resolve(__dirname, 'pages/repartidor.html'),
+        logistica: resolve(__dirname, 'pages/logistica.html'),
         mensajes: resolve(__dirname, 'pages/mensajes.html'),
       }
     }

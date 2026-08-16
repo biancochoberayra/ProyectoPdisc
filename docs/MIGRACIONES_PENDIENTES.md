@@ -28,6 +28,33 @@
    devolvió "Unauthorized. Please provide a valid access token"). Idempotente, no rompe nada si
    se corre después de que alguien la aplique manualmente por otra vía.
 
+2. **Logística de terceros — migraciones 61 a 65 (2026-08-16, rama `feature/logistica-terceros`).**
+   Aplicar **en orden estricto**: cada una depende de la anterior.
+
+   - `61_delivery_providers.sql` — tablas `delivery_providers` + `delivery_couriers`, RLS, y los
+     RPCs `add_courier` / `remove_courier` / `ensure_store_provider` / `my_delivery_provider_ids`.
+   - `62_operador_logistico_role.sql` — rol `operador_logistico` + `create_delivery_provider` +
+     `admin_set_provider_active`.
+     ⚠️ **Correr esta sola, en su propia transacción.** `ALTER TYPE ... ADD VALUE` no puede
+     usarse en la misma transacción que lo agrega. El archivo ya está escrito para que eso no
+     sea problema (ningún `UPDATE` de la migración escribe el valor nuevo), pero si se pegan
+     varios archivos juntos en el SQL Editor, este va aparte.
+   - `63_delivery_assignment.sql` — columnas nuevas en `deliveries`, estado `claimed`, trigger
+     `open_delivery_on_paid`, RPCs `claim_delivery_as_provider` / `assign_delivery` /
+     `release_delivery`, y **`drop function claim_delivery(uuid)`**.
+   - `64_close_delivery_access.sql` — **el cierre de acceso.** Saca la policy de auto-postulación
+     y reemplaza `orders_select_repartidor` (que dejaba a cualquier repartidor leer todos los
+     pedidos pagados de la plataforma). Si se aplica solo una de las cinco, que sea esta —
+     pero no funciona sin la 61 y la 63.
+   - `65_migrate_existing_repartidores.sql` — puente de compatibilidad.
+     ⚠️ **Necesita que exista al menos una cuenta con `app_metadata.role='admin'`.** Si no hay
+     ninguna (era el caso al escribirla, ver CLAUDE.md), el bloque 1 se saltea con un `NOTICE`
+     y **hay que volver a correr la migración** después de asignar el rol admin a mano en el
+     dashboard. Los bloques 2 y 3 corren igual.
+
+   Después de aplicar las cinco, correr `get_advisors` (hay policies y funciones
+   `SECURITY DEFINER` nuevas).
+
 Antes de esta entrada: verificado contra la base real (`list_migrations`, proyecto
 `otzhdwuaffcplrveuadc`) el 2026-07-23: **todas las migraciones 01 a 59 ya
 están aplicadas**, incluidas 54-59 que esta lista había dejado de actualizar

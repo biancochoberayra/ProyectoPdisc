@@ -18,6 +18,10 @@ const TYPE_LABELS = {
   support_ticket_message: 'Soporte respondió a tu reclamo',
   favorite_price_drop: 'Bajó de precio un producto de tus favoritos',
   mp_split_needs_review: 'Tu vinculación con Mercado Pago necesita revisión',
+  // Logística de terceros (migraciones 61-65)
+  courier_added: 'Te dieron de alta como cadete',
+  provider_approved: '¡Tu operador logístico fue dado de alta!',
+  delivery_assigned: 'Te asignaron una entrega',
 };
 
 // Tipos que llevan un link a "Ver producto" (comparten el mismo payload.product_id).
@@ -120,6 +124,10 @@ export async function renderNotificationsSection(container, userId) {
     } else if (n.type === 'support_ticket_status_change' && n.payload?.subject) {
       const statusText = SUPPORT_TICKET_STATUS_LABELS[n.payload.status] || n.payload.status;
       title.textContent = `Tu reclamo "${n.payload.subject}" pasó a: ${statusText}`;
+    } else if (n.type === 'courier_added' && n.payload?.provider_name) {
+      // Igual criterio que stock_alert: saber QUIÉN te dio de alta es la mitad
+      // del aviso -- una persona puede repartir para más de un comercio.
+      title.textContent = `${n.payload.provider_name} te dio de alta como cadete`;
     } else if (n.type === 'support_ticket_message' && n.payload?.subject) {
       title.textContent = `Soporte respondió a tu reclamo "${n.payload.subject}"`;
       if (n.payload?.message) {

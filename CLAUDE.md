@@ -79,6 +79,19 @@ Para que cualquier máquina/sesión trabaje con las mismas herramientas, según 
 
 ## Pendientes activos
 Historial completo de cómo se llegó a cada uno: skill `progreso-baradero-local`.
+- **Logística de terceros (2026-08-16, rama `feature/logistica-terceros`) — SIN MERGEAR NI APLICAR.**
+  Rediseño del reparto: se eliminó la auto-postulación pública de repartidor y se pasó a
+  operadores (cadetería externa + comercio con cadetes propios) con bolsa abierta. Cinco
+  migraciones nuevas (61-65) **pendientes de aplicar** — ver `docs/MIGRACIONES_PENDIENTES.md`,
+  que documenta el orden y las dos trampas (la 62 va en su propia transacción; la 65 necesita
+  una cuenta admin). **No mergear a `main` hasta aplicarlas y probar el flujo completo**: cada
+  push a `main` deploya a producción, y la 64 cambia RLS de `orders`. Nada de esto se pudo
+  probar en la sesión que lo escribió (sin Node instalado en esa máquina → sin `npm run build`,
+  y sin credenciales de Supabase → sin aplicar migraciones).
+- **Rol `admin` en producción, ahora bloqueante para logística.** Ya estaba pendiente (abajo),
+  pero ahora tiene una consecuencia concreta: sin una cuenta admin no se puede dar de alta
+  ninguna cadetería (`create_delivery_provider` exige rol admin) ni completar el bloque 1 de la
+  migración 65.
 - **Instalación de `codebase-memory-mcp` en máquina nueva** — el paso "correr `codebase-memory-mcp install`" ya está documentado arriba, pero falta documentar de dónde se descarga el binario en sí (`~/.local/bin/codebase-memory-mcp.exe`, versión 0.9.0 al 2026-08-11) — no se encontró referencia en el repo ni en la sesión que lo instaló originalmente.
 - **F8-02/F8-03** — Notificaciones por Email/WhatsApp bloqueadas: falta credenciales de un proveedor externo (Resend/Meta Business) **y** escribir el código de integración (verificado 2026-08-03: ninguna edge function llama a Resend ni a la API de WhatsApp/Meta todavía — solo existen las de Mercado Pago). Plantillas de WhatsApp ya redactadas en `docs/WHATSAPP_TEMPLATES.md`.
 - **F11-04** — Dominio propio: requiere que el usuario compre un dominio (decisión de costo). Hoy corre en `proyectopdisc.vercel.app`. Pasos para cuando se compre uno, en `docs/DEPLOY.md`.

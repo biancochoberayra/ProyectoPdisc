@@ -1,132 +1,123 @@
-import { supabase, showToast, setLoading, guardPage } from './auth-utils.js';
-import { isValidPhone } from './validation-utils.js';
+// Panel del cadete — versión "logística de terceros".
+//
+// Qué cambió respecto del modelo anterior (y por qué):
+//   - Ya NO hay formulario de auto-postulación. Antes cualquier cliente
+//     logueado entraba acá, se postulaba y quedaba esperando aprobación del
+//     admin. Ahora al cadete lo da de alta su operador por email
+//     (add_courier, migración 61); no hay puerta de entrada pública.
+//   - Ya NO hay bolsa de pedidos disponibles. El cadete no elige qué reparte:
+//     su despachante le asigna (assign_delivery, migración 63). La bolsa la
+//     ven los operadores, no las personas.
+//   - La página exige rol (guardPage requireRole). El gate real igual está en
+//     RLS: sin fila activa en delivery_couriers no se ve ni se mueve nada.
+//
+// Lo que quedó igual: avanzar el estado de la entrega (asignado -> en camino
+// -> entregado), la calificación promedio y el acceso a soporte.
+
+import { supabase, showToast, guardPage } from './auth-utils.js';
 import { formatPrice } from './cart-utils.js';
 import { fetchReviewsSummary, buildStarsText } from './reviews-utils.js';
 import { renderSupportSection } from './support-utils.js';
 import { initNotificationsBell } from './nav-utils.js';
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
-const registerView = document.getElementById('register-view');
 const statusView = document.getElementById('status-view');
-const statusIcon = document.getElementById('status-icon');
-const statusTitle = document.getElementById('status-title');
-const statusText = document.getElementById('status-text');
 const dashboardView = document.getElementById('dashboard-view');
 
-// El form de registro arranca oculto (no tiene display:none por CSS): así no
-// "parpadea" antes de que checkDeliveryState decida la vista correcta. Antes se
-// veía el form de "Sumate como repartidor" y saltaba al dashboard/estado.
-if (registerView) registerView.style.display = 'none';
+const DELIVERY_STATUS_LABELS = {
+  claimed: 'Sin asignar',
+  assigned: 'Asignado',
+  picked_up: 'En camino',
+  delivered: 'Entregado',
+};
+
+// Qué botón mostrar según el estado actual (assigned -> picked_up -> delivered)
+const DELIVERY_NEXT_STATUS = {
+  assigned: { value: 'picked_up', label: 'Marcar en camino' },
+  picked_up: { value: 'delivered', label: 'Marcar entregado' },
+};
 
 function showStatus({ icon, title, text }) {
-  registerView.style.display = 'none';
   dashboardView.style.display = 'none';
   statusView.style.display = 'block';
-  statusIcon.className = icon;
-  statusTitle.textContent = title;
-  statusText.textContent = text;
+  document.getElementById('status-icon').className = icon;
+  document.getElementById('status-title').textContent = title;
+  document.getElementById('status-text').textContent = text;
 }
 
 function showDashboard() {
-  registerView.style.display = 'none';
   statusView.style.display = 'none';
   dashboardView.style.display = 'block';
 }
 
-/** Repartidor ya aprobado, solicitud pendiente, o nada todavía (mostrar form) */
-async function checkDeliveryState(user) {
-  // El rol ya está en el JWT (app_metadata.role), que es lo que evalúa RLS. Para
-  // un repartidor aprobado (caso común) mostramos el dashboard al instante sin
-  // esperar el round-trip a profiles — así no parpadea el form. El fetch a
-  // profiles queda solo como fallback si el JWT todavía no trae el rol.
-  let role = user.app_metadata?.role;
-  if (role !== 'repartidor') {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    role = profile?.role;
-  }
-
-  if (role === 'repartidor') {
-    showDashboard();
-    loadAvailableOrders();
-    loadMyDeliveries(user.id);
-    loadMyRating(user.id);
-    const supportContainer = document.getElementById('support-container');
-    if (supportContainer) renderSupportSection(supportContainer);
-    return;
-  }
-
-  const { data: req } = await supabase
-    .from('delivery_requests')
-    .select('status')
+/**
+ * ¿Esta cuenta es un cadete activo de un operador activo?
+ *
+ * Reemplaza al viejo checkDeliveryState, que miraba delivery_requests para
+ * saber si la solicitud estaba pendiente/rechazada/aprobada. Ese flujo ya no
+ * existe: ahora la pregunta es "¿algún operador te dio de alta?".
+ */
+async function checkCourierState(user) {
+  const { data: courier, error } = await supabase
+    .from('delivery_couriers')
+    .select('id, full_name, is_active, delivery_providers ( id, name, is_active )')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
     .maybeSingle();
 
-  if (req?.status === 'pending') {
+  if (error) {
+    console.error('Error al verificar el alta de cadete:', error);
     showStatus({
-      icon: 'fa-regular fa-clock',
-      title: 'Solicitud en revisión',
-      text: 'Te avisamos apenas el equipo la revise.',
+      icon: 'fa-solid fa-triangle-exclamation',
+      title: 'No pudimos cargar tu panel',
+      text: 'Probá de nuevo en un rato. Si sigue pasando, escribinos.',
     });
     return;
   }
 
-  if (req?.status === 'rejected') {
+  if (!courier) {
     showStatus({
-      icon: 'fa-solid fa-circle-xmark',
-      title: 'Solicitud rechazada',
-      text: 'Podés escribirnos si creés que fue un error, o volver a intentarlo más adelante.',
+      icon: 'fa-solid fa-circle-info',
+      title: 'No estás dado de alta como cadete',
+      text: 'Para repartir en Baradero Local tenés que estar dado de alta por un operador logístico o por el comercio con el que trabajás. Pediles que te agreguen con el email de esta cuenta.',
     });
     return;
   }
 
-  // Sin solicitud todavía: mostrar el formulario
-  registerView.style.display = 'block';
-  statusView.style.display = 'none';
-  dashboardView.style.display = 'none';
+  if (!courier.is_active) {
+    showStatus({
+      icon: 'fa-regular fa-circle-pause',
+      title: 'Tu alta está pausada',
+      text: `${courier.delivery_providers?.name || 'Tu operador'} te tiene marcado como inactivo. Hablá con tu despachante para volver a recibir entregas.`,
+    });
+    return;
+  }
+
+  if (courier.delivery_providers && !courier.delivery_providers.is_active) {
+    showStatus({
+      icon: 'fa-solid fa-circle-exclamation',
+      title: 'Tu operador está suspendido',
+      text: 'Mientras el operador esté suspendido no vas a recibir entregas nuevas.',
+    });
+    return;
+  }
+
+  showDashboard();
+
+  const providerLabel = document.getElementById('courier-provider');
+  if (providerLabel) {
+    providerLabel.textContent = courier.delivery_providers?.name
+      ? `Repartís para ${courier.delivery_providers.name}`
+      : '';
+  }
+
+  loadMyDeliveries(user.id);
+  loadMyRating(user.id);
+
+  const supportContainer = document.getElementById('support-container');
+  if (supportContainer) renderSupportSection(supportContainer);
 }
 
-/** Construye una tarjeta de pedido disponible con botón "Tomar pedido" */
-function buildAvailableOrderCard(order, onClaim) {
-  const card = document.createElement('div');
-  card.className = 'delivery-card';
-
-  const info = document.createElement('div');
-  info.className = 'delivery-card__info';
-
-  const storeSpan = document.createElement('span');
-  storeSpan.className = 'delivery-card__store';
-  storeSpan.textContent = order.stores?.name || 'Comercio';
-  info.appendChild(storeSpan);
-
-  const addressSpan = document.createElement('span');
-  addressSpan.className = 'delivery-card__address';
-  addressSpan.textContent = order.shipping_address || 'Sin dirección';
-  info.appendChild(addressSpan);
-
-  const totalSpan = document.createElement('span');
-  totalSpan.className = 'delivery-card__address';
-  totalSpan.textContent = formatPrice(order.total_price);
-  info.appendChild(totalSpan);
-
-  card.appendChild(info);
-
-  const claimBtn = document.createElement('button');
-  claimBtn.type = 'button';
-  claimBtn.className = 'form-btn';
-  claimBtn.style.cssText = 'width: auto; padding: 0.5rem 1.25rem;';
-  claimBtn.textContent = 'Tomar pedido';
-  claimBtn.addEventListener('click', () => onClaim(order.id, claimBtn));
-  card.appendChild(claimBtn);
-
-  return card;
-}
-
-/** Construye una tarjeta de "mis entregas" (ya tomadas) */
+/** Tarjeta de una entrega asignada a este cadete. */
 function buildMyDeliveryCard(delivery, clientPhone) {
   const order = delivery.orders;
   const card = document.createElement('div');
@@ -145,8 +136,15 @@ function buildMyDeliveryCard(delivery, clientPhone) {
   addressSpan.textContent = order?.shipping_address || 'Sin dirección';
   info.appendChild(addressSpan);
 
-  // F12-05: teléfono del cliente para coordinar la entrega (solo si lo cargó
-  // en su perfil).
+  if (order?.total_price != null) {
+    const totalSpan = document.createElement('span');
+    totalSpan.className = 'delivery-card__address';
+    totalSpan.textContent = formatPrice(order.total_price);
+    info.appendChild(totalSpan);
+  }
+
+  // Teléfono del cliente para coordinar la entrega (solo si lo cargó en su
+  // perfil). Visible por profiles_select_order_participants.
   if (clientPhone) {
     const phoneSpan = document.createElement('span');
     phoneSpan.className = 'delivery-card__address';
@@ -178,18 +176,6 @@ function buildMyDeliveryCard(delivery, clientPhone) {
   return card;
 }
 
-const DELIVERY_STATUS_LABELS = {
-  assigned: 'Asignado',
-  picked_up: 'En camino',
-  delivered: 'Entregado',
-};
-
-// Qué botón mostrar según el estado actual (assigned -> picked_up -> delivered)
-const DELIVERY_NEXT_STATUS = {
-  assigned: { value: 'picked_up', label: 'Marcar en camino' },
-  picked_up: { value: 'delivered', label: 'Marcar entregado' },
-};
-
 async function handleAdvanceStatus(deliveryId, newStatus, btn) {
   btn.disabled = true;
   const originalText = btn.textContent;
@@ -213,77 +199,16 @@ async function handleAdvanceStatus(deliveryId, newStatus, btn) {
   if (user) loadMyDeliveries(user.id);
 }
 
-async function loadAvailableOrders() {
-  const container = document.getElementById('available-orders-container');
-  if (!container) return;
-
-  const [{ data: orders, error: ordersError }, { data: takenDeliveries, error: deliveriesError }] = await Promise.all([
-    supabase
-      .from('orders')
-      .select('id, store_id, total_price, shipping_address, created_at, stores ( name )')
-      .eq('delivery_method', 'delivery')
-      .eq('payment_status', 'paid')
-      .order('created_at', { ascending: true }),
-    supabase.from('deliveries').select('order_id'),
-  ]);
-
-  container.textContent = '';
-
-  if (ordersError || deliveriesError) {
-    console.error('Error al cargar pedidos disponibles:', ordersError || deliveriesError);
-    const errorMsg = document.createElement('p');
-    errorMsg.className = 'delivery-empty';
-    errorMsg.textContent = 'Error al cargar los pedidos disponibles.';
-    container.appendChild(errorMsg);
-    return;
-  }
-
-  const takenOrderIds = new Set((takenDeliveries || []).map((d) => d.order_id));
-  const available = (orders || []).filter((o) => !takenOrderIds.has(o.id));
-
-  if (available.length === 0) {
-    const emptyMsg = document.createElement('p');
-    emptyMsg.className = 'delivery-empty';
-    emptyMsg.textContent = 'No hay pedidos disponibles por ahora.';
-    container.appendChild(emptyMsg);
-    return;
-  }
-
-  available.forEach((order) => {
-    container.appendChild(buildAvailableOrderCard(order, handleClaim));
-  });
-}
-
-async function handleClaim(orderId, btn) {
-  btn.disabled = true;
-  btn.textContent = 'Tomando...';
-
-  const { error } = await supabase.rpc('claim_delivery', { p_order_id: orderId });
-
-  if (error) {
-    console.error('Error al tomar el pedido:', error);
-    showToast(error.message || 'No se pudo tomar el pedido.', 'error');
-    btn.disabled = false;
-    btn.textContent = 'Tomar pedido';
-    loadAvailableOrders();
-    return;
-  }
-
-  showToast('¡Pedido tomado! Ya aparece en "Mis entregas".', 'success');
-  const { data: { user } } = await supabase.auth.getUser();
-  loadAvailableOrders();
-  if (user) loadMyDeliveries(user.id);
-}
-
 async function loadMyDeliveries(userId) {
   const container = document.getElementById('my-deliveries-container');
   if (!container) return;
 
   const { data, error } = await supabase
     .from('deliveries')
-    .select('id, status, orders ( client_id, shipping_address, stores ( name ) )')
+    .select('id, status, orders ( client_id, shipping_address, total_price, stores ( name ) )')
     .eq('repartidor_id', userId)
-    .order('created_at', { ascending: false });
+    .in('status', ['assigned', 'picked_up'])
+    .order('assigned_at', { ascending: true });
 
   container.textContent = '';
 
@@ -299,15 +224,13 @@ async function loadMyDeliveries(userId) {
   if (!data || data.length === 0) {
     const emptyMsg = document.createElement('p');
     emptyMsg.className = 'delivery-empty';
-    emptyMsg.textContent = 'Todavía no tomaste ningún pedido.';
+    emptyMsg.textContent = 'No tenés entregas asignadas por ahora. Cuando tu despachante te asigne una, aparece acá.';
     container.appendChild(emptyMsg);
     return;
   }
 
-  // F12-05: teléfono del cliente para coordinar la entrega -- orders.client_id
-  // no tiene FK a profiles (sí a auth.users), así que hace falta una segunda
-  // consulta. RLS nueva (profiles_select_order_participants) es la que
-  // permite verlo: solo clientes con una entrega asignada a este repartidor.
+  // orders.client_id no tiene FK a profiles (sí a auth.users), así que hace
+  // falta una segunda consulta para el teléfono.
   const clientIds = [...new Set(data.map((d) => d.orders?.client_id).filter(Boolean))];
   const { data: clientProfiles } = clientIds.length
     ? await supabase.from('profiles').select('id, phone').in('id', clientIds)
@@ -319,8 +242,7 @@ async function loadMyDeliveries(userId) {
   });
 }
 
-/** F12-08: "Mi calificación" -- promedio de las reseñas que dejaron los
- * clientes tras una entrega (reviews.target_type='repartidor', F12-08). */
+/** "Mi calificación" — promedio de las reseñas que dejaron los clientes. */
 async function loadMyRating(userId) {
   const el = document.getElementById('repartidor-rating');
   if (!el) return;
@@ -332,84 +254,21 @@ async function loadMyRating(userId) {
 }
 
 function initRepartidorPage(user) {
-  checkDeliveryState(user);
   initNotificationsBell();
-
-  const form = document.getElementById('delivery-form');
-  const submitBtn = form?.querySelector('button[type="submit"]');
-  const vehicleTypeSelect = document.getElementById('delivery-vehicle-type');
-  const plateGroup = document.getElementById('delivery-plate-group');
-  const plateInput = document.getElementById('delivery-plate');
-
-  function updatePlateVisibility() {
-    const needsPlate = vehicleTypeSelect.value !== 'bicicleta';
-    plateGroup.style.display = needsPlate ? 'block' : 'none';
-  }
-  vehicleTypeSelect?.addEventListener('change', updatePlateVisibility);
-  updatePlateVisibility();
-
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const fullName = document.getElementById('delivery-name').value.trim();
-    const phone = document.getElementById('delivery-phone').value.trim();
-    const vehicleType = vehicleTypeSelect.value;
-    const vehiclePlate = plateInput.value.trim();
-
-    if (fullName.length < 3) {
-      showToast('Ingresá tu nombre completo.', 'error');
-      return;
-    }
-    if (!isValidPhone(phone)) {
-      showToast('El teléfono ingresado no es válido.', 'error');
-      return;
-    }
-    if (vehicleType !== 'bicicleta' && !vehiclePlate) {
-      showToast('Ingresá la patente del vehículo.', 'error');
-      return;
-    }
-
-    setLoading(submitBtn, true, 'Enviar solicitud');
-
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (!currentUser) {
-      showToast('Sesión inválida.', 'error');
-      setLoading(submitBtn, false, 'Enviar solicitud');
-      return;
-    }
-
-    const { error } = await supabase.from('delivery_requests').insert({
-      user_id: currentUser.id,
-      full_name: fullName,
-      phone,
-      vehicle_type: vehicleType,
-      vehicle_plate: vehicleType === 'bicicleta' ? null : vehiclePlate,
-    });
-
-    if (error) {
-      console.error('Error al enviar solicitud de repartidor:', error);
-      showToast('Hubo un error al procesar tu solicitud.', 'error');
-      setLoading(submitBtn, false, 'Enviar solicitud');
-      return;
-    }
-
-    showToast('¡Solicitud enviada! Te avisamos cuando la revisemos.', 'success');
-    showStatus({
-      icon: 'fa-regular fa-clock',
-      title: 'Solicitud en revisión',
-      text: 'Te avisamos apenas el equipo la revise.',
-    });
-  });
+  checkCourierState(user);
 
   document.getElementById('btn-back-home')?.addEventListener('click', () => {
     window.location.href = './home.html';
   });
 }
 
-// Página PRIVADA: si no hay sesión → redirigir a Login
+// Página PRIVADA y CERRADA. 'operador_logistico' entra también porque un
+// despachante chico puede repartir él mismo; si no tiene alta de cadete ve el
+// mensaje de "no estás dado de alta", no una pantalla rota.
 guardPage({
   requireAuth: true,
+  requireRole: ['repartidor', 'operador_logistico', 'admin'],
   onReady: (user) => {
-    initRepartidorPage(user);
+    if (user) initRepartidorPage(user);
   },
 });

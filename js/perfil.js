@@ -119,6 +119,19 @@ function renderQuickProfile(user) {
     }
   }
 
+  // Accesos rápidos de logística: se muestran SOLO si el JWT trae el rol.
+  // repartidor.html y logistica.html dejaron de ser páginas de alta pública
+  // con el modelo de terceros -- ahora exigen rol, así que ofrecerle el botón
+  // a un cliente común sería mandarlo a un rebote a home.
+  const quickBtnRepartidor = document.getElementById("quick-btn-repartidor");
+  const quickBtnLogistica = document.getElementById("quick-btn-logistica");
+  if (quickBtnRepartidor && quickRole === "repartidor") {
+    quickBtnRepartidor.style.display = "";
+  }
+  if (quickBtnLogistica && quickRole === "operador_logistico") {
+    quickBtnLogistica.style.display = "";
+  }
+
   // Cambiar de rol (cliente/vendedor -> administrador/moderador): el rol real
   // que evalúa la RLS/el gate de admin.html vive en app_metadata (JWT), no en
   // profiles.role -- mismo campo que arregló guardPage en F12-17. Solo se
