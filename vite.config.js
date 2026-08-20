@@ -37,6 +37,7 @@ export default defineConfig({
         terminos: resolve(__dirname, 'pages/terminos.html'),
         privacidad: resolve(__dirname, 'pages/privacidad.html'),
         info: resolve(__dirname, 'pages/info.html'),
+        farmacias: resolve(__dirname, 'pages/farmacias.html'),
         repartidor: resolve(__dirname, 'pages/repartidor.html'),
         mensajes: resolve(__dirname, 'pages/mensajes.html'),
       }

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https://*.googleusercontent.com https://*.supabase.co; connect-src 'self' https://*.supabase.co https://accounts.google.com;">
+    <meta name="description" content="Farmacias de turno en Baradero — sección en preparación." />
+    <title>Farmacias de turno - Baradero Local</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="../Assets/styles/home.css" />
+    <style>
+      .fx-wrap {
+        max-width: 640px;
+        margin: 3rem auto;
+        padding: 2rem;
+        background: var(--bl-surface);
+        border: 1px solid var(--bl-border);
+        border-radius: var(--bl-radius-xl);
+        box-shadow: var(--bl-shadow-lg);
+        text-align: center;
+      }
+      .fx-icon {
+        font-size: 2.5rem;
+        color: var(--bl-primary);
+        margin-bottom: 1rem;
+      }
+      .fx-wrap h1 {
+        font-size: 1.75rem;
+        color: var(--bl-primary-deeper);
+        margin-bottom: 0.75rem;
+      }
+      .fx-wrap p {
+        color: var(--bl-text-secondary);
+        line-height: 1.7;
+        margin-bottom: 1rem;
+      }
+      .fx-note {
+        text-align: left;
+        background: var(--bl-surface-alt);
+        border: 1px solid var(--bl-border);
+        border-radius: var(--bl-radius-md);
+        padding: 1rem 1.25rem;
+        margin: 1.5rem 0;
+      }
+      .fx-note strong { color: var(--bl-text); }
+      .fx-back {
+        display: inline-block;
+        margin-top: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: var(--bl-primary);
+        color: #fff;
+        border-radius: var(--bl-radius-md);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .fx-back:hover { background: var(--bl-primary-dark); }
+      @media (max-width: 768px) {
+        .fx-wrap { margin: 1rem; padding: 1.5rem; }
+        .fx-wrap h1 { font-size: 1.4rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar" role="navigation" aria-label="Navegación principal">
+      <div class="navbar__top">
+        <a href="./home.html" class="navbar__logo">
+          <img src="../Assets/images/Logos/logoazulpng.png" alt="Baradero Local" class="navbar__logo-img" />
+          <div class="navbar__logo-text">
+            <span class="navbar__logo-title">Baradero Local</span>
+            <span class="navbar__logo-subtitle">Baradero, más cerca que nunca</span>
+          </div>
+        </a>
+        <div class="navbar__actions">
+          <a href="./home.html" class="navbar__action-circle" aria-label="Volver al inicio"><i class="fa-solid fa-arrow-left"></i></a>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <div class="fx-wrap">
+        <div class="fx-icon"><i class="fa-solid fa-prescription-bottle-medical"></i></div>
+        <h1>Farmacias de turno</h1>
+        <p>Estamos preparando esta sección: vas a poder ver la farmacia de turno de hoy y la de toda la semana, con dirección, horarios y cómo llegar.</p>
+
+        <!-- Este bloque es deliberado y no es relleno: hasta que exista una
+             fuente de datos real y alguien que la mantenga cada semana,
+             publicar un turno acá sería peor que no publicar nada. La versión
+             anterior de esta función era un alert() con una farmacia,
+             dirección y teléfono INVENTADOS -- se quitó por eso mismo. -->
+        <div class="fx-note">
+          <p style="margin-bottom: 0.5rem;"><strong>Mientras tanto, no te quedes con la duda.</strong></p>
+          <p style="margin-bottom: 0;">Consultá el turno del día por los canales oficiales del municipio o llamando directamente a la farmacia. Preferimos no mostrarte un dato que no podamos garantizar: en una urgencia, una dirección equivocada te hace perder tiempo.</p>
+        </div>
+
+        <p style="font-size: 0.9rem;">¿Trabajás en una farmacia de Baradero y querés que aparezca acá? Escribinos a <strong>soporte@baraderolocal.com.ar</strong>.</p>
+
+        <a href="./home.html" class="fx-back"><i class="fa-solid fa-arrow-left"></i> Volver al inicio</a>
+      </div>
+    </main>
+  </body>
+</html>

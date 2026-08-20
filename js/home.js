@@ -117,19 +117,18 @@ async function loadProducts() {
   }
 }
 
-/** Configurar modal de Farmacia de Turno */
-function initFarmaciaLink() {
-  const farmaciaLink = document.getElementById('farmacia-link');
-  if (!farmaciaLink) return;
-
-  farmaciaLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    // Modal nativo básico para simular la funcionalidad
-    const d = new Date();
-    const dia = d.toLocaleDateString('es-AR', { weekday: 'long' });
-    alert(`Farmacia de turno hoy (${dia}):\n\nFarmacia Central\n📍 San Martín 1234\n📞 3329-420000\nHorario: 24hs`);
-  });
-}
+// El link de "Farmacias de turno" ahora es un <a> común a farmacias.html: no
+// necesita JS.
+//
+// Antes acá había un initFarmaciaLink() que abría un alert() con una farmacia,
+// una dirección y un teléfono INVENTADOS ("Farmacia Central, San Martín 1234,
+// 3329-420000"), puestos como placeholder y nunca reemplazados. La tarea
+// figuraba como terminada en Jira (A113-10). Se quitó porque es el único lugar
+// del sistema donde un dato falso puede mandar a un vecino a una puerta
+// cerrada de madrugada: acá el placeholder no era gratis.
+//
+// La página real (turno del día + semana completa + mapa) está pendiente y
+// depende de tener una fuente de datos mantenida, no de la interfaz.
 
 /** Obtener locales destacados de Supabase para el carrusel */
 async function loadStores() {
@@ -188,7 +187,6 @@ async function loadStores() {
 document.addEventListener('DOMContentLoaded', () => {
   initScrollTop();
   initNavbarScroll();
-  initFarmaciaLink();
   updateCartBadge();
 
   // Navbar de categorías (mega-menú) + buscador con autocompletado (compartidos)

@@ -22,11 +22,22 @@
 
 ## Pendientes (en orden de aplicación)
 
-1. `db/schema/60_seller_request_multi_category.sql` — agrega `seller_requests.category_slugs`
-   (array) para P2-10 (multi-rubro al registrarse como vendedor). No se pudo aplicar en esta
-   sesión (2026-08-03): sin credenciales de Supabase cargadas (`mcp__supabase__apply_migration`
-   devolvió "Unauthorized. Please provide a valid access token"). Idempotente, no rompe nada si
-   se corre después de que alguien la aplique manualmente por otra vía.
+*(Sin pendientes en esta rama.)*
+
+## ✅ Aplicadas recientemente
+
+- `db/schema/60_seller_request_multi_category.sql` — **aplicada el 2026-08-16** vía
+  `apply_migration` (nombre en Supabase: `seller_request_multi_category`). Agrega
+  `seller_requests.category_slugs` (array) para P2-10. Verificado post-aplicación: la columna
+  existe y el backfill corrió sobre 2 de las 3 solicitudes (la tercera es la fila vieja de
+  prueba con `category_slug` en null, sin rubro que copiar — esperado, mismo caso que
+  documenta `16_input_validation_constraints.sql`).
+
+> **Ojo si trabajás en otra rama:** hay migraciones pendientes que **no viven en `main`**.
+> `feature/logistica-terceros` trae las **61 a 65** (logística de terceros) y
+> `feature/carrito-seleccion-por-comercio` trae la **66** (preferencia de ayudas del carrito).
+> Cada una está documentada en el `MIGRACIONES_PENDIENTES.md` de su propia rama. Los números
+> 61-65 y 66 ya están reservados: no los reutilices.
 
 Antes de esta entrada: verificado contra la base real (`list_migrations`, proyecto
 `otzhdwuaffcplrveuadc`) el 2026-07-23: **todas las migraciones 01 a 59 ya
