@@ -5,6 +5,40 @@ description: Historial detallado de todas las fases completadas (F0 a F12) del p
 
 # Historial de fases — Baradero Local
 
+## Farmacias de turno (2026-08-16) — A113-261, rama `feature/farmacias-de-turno`
+
+Reemplaza el `alert()` de `js/home.js` que mostraba una farmacia, dirección y teléfono
+**inventados** (`A113-10`, que figuraba Finalizada). Primero se quitó el dato falso y se puso una
+página honesta de "en preparación" (rama `fix/farmacia-turno-placeholder`, commit `7fe8ec0`);
+después se construyó la página real sobre esa base.
+
+- **Modelo**: dos tablas separadas a propósito (migración 67). `pharmacies` son los datos fijos
+  (cambian una vez por año) y `pharmacy_shifts` el turno por día (cambia cada semana). Juntarlas
+  obligaría a recargar los datos fijos en cada turno nuevo — la clase de fricción que hace que una
+  sección así se quede sin mantener. `unique(shift_date)`: una farmacia de guardia por día.
+- **RLS**: lectura pública **incluido `anon`** (es información de utilidad pública, la página tiene
+  que servir sin login), escritura solo `admin`. Triggers de auditoría en ambas tablas: cargar mal
+  un turno manda gente a la puerta equivocada.
+- **La lógica que hay que no romper — el turno cruza la medianoche.** `closes_at` se interpreta
+  siempre como del día SIGUIENTE a `shift_date`, así que a las 3 de la mañana la farmacia de turno
+  es la de **ayer**. Por eso `loadFarmacias()` consulta desde ayer y elige por ventana
+  (`isActiveNow`), no por `shift_date = hoy`. Probado con node contra el archivo real (8 casos,
+  incluido "domingo 03:00 con el turno del sábado" y un turno diurno que no cruza medianoche).
+- **El mapa NO se embebe.** La CSP del proyecto (`img-src 'self' data: *.supabase.co`) bloquea los
+  tiles de Google/OSM. En vez de ampliarla, la tarjeta de ubicación es un link que abre Maps
+  afuera — una navegación no la bloquea la CSP. Si `maps_url` está vacío, se arma con la dirección.
+- **Gotcha caro**: la tabla `pharmacies` **ya existía** en producción de un intento anterior
+  (vacía, sin `whatsapp/pharmacist/insurances/maps_url/updated_at`). El `create table if not exists`
+  se salteó la tabla en silencio y la página falló con `column pharmacies.whatsapp does not exist`.
+  Lección: para tablas que pueden preexistir, `create` mínimo + `add column if not exists` por
+  columna. Ver `docs/MIGRACIONES_PENDIENTES.md`.
+- **Estados vacíos, que acá son la funcionalidad principal**: sin turno para el momento actual, la
+  página lo dice; sin turnos futuros, lo dice; si el último turno cargado tiene 10 días o más, el
+  aviso de "actualizado el X" se degrada a advertencia roja. Nunca se muestra "una farmacia
+  cualquiera" para llenar el hueco.
+- **Pendiente real, y no es código**: las tablas están vacías. Falta cargar las farmacias de
+  Baradero y definir **quién carga los turnos cada semana**. Sin eso la página se vuelve el mismo
+  problema que vino a arreglar, más grande.
 ## Arreglo del flujo de registro/login (2026-08-15)
 Rama `fix-flujo-registro-login`. El usuario reportó tres cosas: (1) después de registrarse la app
 igual le pedía iniciar sesión, (2) el registro no pedía repetir la contraseña, (3) los Términos y

@@ -26,6 +26,20 @@
 
 ## ✅ Aplicadas recientemente
 
+- `db/schema/67_pharmacies.sql` — **aplicada el 2026-08-16** (A113-261). Crea `pharmacies` y
+  `pharmacy_shifts` con RLS (lectura pública incluido `anon`, escritura solo admin) y triggers de
+  auditoría.
+  **Gotcha que costó un rato:** la tabla `pharmacies` **ya existía** en producción de un intento
+  anterior de esta misma función (vacía, con `id/name/address/phone/hours/is_active/created_at`).
+  Un `create table if not exists` con la definición completa **no falla pero tampoco agrega nada**:
+  se saltea la tabla en silencio y la página revienta después con
+  `column pharmacies.whatsapp does not exist`. La migración quedó reescrita con
+  `create table` mínimo + `alter table ... add column if not exists` por columna, que es idempotente
+  y sirve tanto en base limpia como en la que ya tenía la tabla vieja. Se aplicó también una
+  migración correctiva (`pharmacies_missing_columns`) sobre la base real.
+  Las tablas quedan **vacías a propósito**: no hay seed porque no tenemos los datos reales de las
+  farmacias de Baradero, e inventarlos sería repetir el bug que este módulo vino a arreglar.
+
 - `db/schema/60_seller_request_multi_category.sql` — **aplicada el 2026-08-16** vía
   `apply_migration` (nombre en Supabase: `seller_request_multi_category`). Agrega
   `seller_requests.category_slugs` (array) para P2-10. Verificado post-aplicación: la columna

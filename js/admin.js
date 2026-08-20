@@ -863,6 +863,245 @@ async function handleProofDecisionAdmin(proofId, approve) {
   fetchPendingProofsAdmin();
 }
 
+// --- A113-261: farmacias de turno ---
+//
+// Dos bloques separados porque tienen ritmos distintos: la ficha de una
+// farmacia se carga una vez, el turno se asigna todas las semanas. Esa
+// fricción es la que decide si la sección se mantiene actualizada o se
+// pudre — y una lista de turnos vencida es tan dañina como el alert() con
+// datos inventados que este módulo vino a reemplazar.
+
+let pharmaciesCache = [];
+
+async function fetchPharmacies() {
+  const tbody = document.getElementById('pharmacies-tbody');
+  const select = document.getElementById('shift-pharmacy');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Cargando farmacias...</td></tr>';
+
+  const { data, error } = await supabase
+    .from('pharmacies')
+    .select('id, name, address, phone, whatsapp, pharmacist, insurances, is_active')
+    .order('name');
+
+  if (error) {
+    console.error('Error al cargar farmacias:', error);
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#ef4444;">Error al cargar las farmacias.</td></tr>';
+    return;
+  }
+
+  pharmaciesCache = data || [];
+
+  // El select del formulario de turnos sale de acá: no se puede asignar un
+  // turno a una farmacia que no está cargada.
+  if (select) {
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = pharmaciesCache.length ? 'Elegí una farmacia...' : 'Cargá una farmacia primero';
+    select.appendChild(placeholder);
+    pharmaciesCache.filter((p) => p.is_active).forEach((p) => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      select.appendChild(opt);
+    });
+  }
+
+  if (pharmaciesCache.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay farmacias cargadas todavía.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  pharmaciesCache.forEach((ph) => {
+    const tr = document.createElement('tr');
+
+    const tdName = document.createElement('td');
+    tdName.textContent = ph.name;
+    tr.appendChild(tdName);
+
+    const tdAddress = document.createElement('td');
+    tdAddress.textContent = ph.address;
+    tr.appendChild(tdAddress);
+
+    const tdContact = document.createElement('td');
+    tdContact.textContent = [ph.phone, ph.whatsapp].filter(Boolean).join(' · ') || '-';
+    tr.appendChild(tdContact);
+
+    const tdStatus = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = `status-badge ${ph.is_active ? 'status-approved' : 'status-suspended'}`;
+    badge.textContent = ph.is_active ? 'Activa' : 'Inactiva';
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    const tdActions = document.createElement('td');
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = `action-btn ${ph.is_active ? 'btn-suspend' : 'btn-reactivate'}`;
+    toggleBtn.textContent = ph.is_active ? 'Desactivar' : 'Activar';
+    toggleBtn.addEventListener('click', async () => {
+      const { error: updErr } = await supabase
+        .from('pharmacies')
+        .update({ is_active: !ph.is_active })
+        .eq('id', ph.id);
+      if (updErr) {
+        showToast(updErr.message || 'No se pudo actualizar la farmacia.', 'error');
+        return;
+      }
+      fetchPharmacies();
+    });
+    tdActions.appendChild(toggleBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+}
+
+async function fetchShifts() {
+  const tbody = document.getElementById('shifts-tbody');
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Cargando turnos...</td></tr>';
+
+  // Desde ayer: a la madrugada el turno vigente sigue siendo el del día
+  // anterior, así que esconderlo confundiría a quien está cargando.
+  const desde = new Date();
+  desde.setDate(desde.getDate() - 1);
+  const desdeIso = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, '0')}-${String(desde.getDate()).padStart(2, '0')}`;
+
+  const { data, error } = await supabase
+    .from('pharmacy_shifts')
+    .select('id, shift_date, opens_at, closes_at, pharmacies ( name )')
+    .gte('shift_date', desdeIso)
+    .order('shift_date', { ascending: true });
+
+  if (error) {
+    console.error('Error al cargar turnos:', error);
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#ef4444;">Error al cargar los turnos.</td></tr>';
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay turnos cargados. La página pública va a avisar que no hay dato.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.forEach((shift) => {
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    const [y, m, d] = shift.shift_date.split('-').map(Number);
+    tdDate.textContent = new Date(y, m - 1, d).toLocaleDateString('es-AR', {
+      weekday: 'short', day: 'numeric', month: 'short',
+    });
+    tr.appendChild(tdDate);
+
+    const tdName = document.createElement('td');
+    tdName.textContent = shift.pharmacies?.name || '(farmacia borrada)';
+    tr.appendChild(tdName);
+
+    const tdHours = document.createElement('td');
+    tdHours.textContent = `${shift.opens_at.slice(0, 5)} a ${shift.closes_at.slice(0, 5)}`;
+    tr.appendChild(tdHours);
+
+    const tdActions = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'action-btn btn-suspend';
+    delBtn.textContent = 'Quitar';
+    delBtn.addEventListener('click', async () => {
+      if (!confirm(`¿Quitar el turno del ${tdDate.textContent}?`)) return;
+      const { error: delErr } = await supabase.from('pharmacy_shifts').delete().eq('id', shift.id);
+      if (delErr) {
+        showToast(delErr.message || 'No se pudo quitar el turno.', 'error');
+        return;
+      }
+      showToast('Turno quitado.', 'success');
+      fetchShifts();
+    });
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function setupPharmacyForms() {
+  const pharmacyForm = document.getElementById('pharmacy-form');
+  pharmacyForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = pharmacyForm.querySelector('button[type="submit"]');
+    btn.disabled = true;
+
+    const insurancesRaw = document.getElementById('pharmacy-insurances').value.trim();
+
+    const { error } = await supabase.from('pharmacies').insert({
+      name: document.getElementById('pharmacy-name').value.trim(),
+      address: document.getElementById('pharmacy-address').value.trim(),
+      phone: document.getElementById('pharmacy-phone').value.trim() || null,
+      whatsapp: document.getElementById('pharmacy-whatsapp').value.trim() || null,
+      pharmacist: document.getElementById('pharmacy-pharmacist').value.trim() || null,
+      insurances: insurancesRaw ? insurancesRaw.split(',').map((s) => s.trim()).filter(Boolean) : null,
+    });
+
+    btn.disabled = false;
+
+    if (error) {
+      console.error('Error al agregar farmacia:', error);
+      showToast(error.message || 'No se pudo agregar la farmacia.', 'error');
+      return;
+    }
+
+    showToast('Farmacia agregada.', 'success');
+    pharmacyForm.reset();
+    fetchPharmacies();
+  });
+
+  const shiftForm = document.getElementById('shift-form');
+  shiftForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = shiftForm.querySelector('button[type="submit"]');
+    const pharmacyId = document.getElementById('shift-pharmacy').value;
+
+    if (!pharmacyId) {
+      showToast('Elegí una farmacia.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+
+    const { error } = await supabase.from('pharmacy_shifts').insert({
+      pharmacy_id: pharmacyId,
+      shift_date: document.getElementById('shift-date').value,
+      opens_at: document.getElementById('shift-opens').value,
+      closes_at: document.getElementById('shift-closes').value,
+    });
+
+    btn.disabled = false;
+
+    if (error) {
+      console.error('Error al asignar turno:', error);
+      // La restricción unique(shift_date) es intencional: una farmacia de
+      // guardia por día. El mensaje crudo de Postgres no lo explica.
+      const msg = error.code === '23505'
+        ? 'Ya hay una farmacia de turno para esa fecha. Quitá la existente antes de cargar otra.'
+        : (error.message || 'No se pudo asignar el turno.');
+      showToast(msg, 'error');
+      return;
+    }
+
+    showToast('Turno asignado.', 'success');
+    shiftForm.reset();
+    document.getElementById('shift-opens').value = '08:00';
+    document.getElementById('shift-closes').value = '08:00';
+    fetchShifts();
+  });
+}
+
+/** Las dos tablas de la sección se cargan juntas. */
+async function loadPharmaciesSection() {
+  await fetchPharmacies();
+  await fetchShifts();
+}
+
 // --- F7-03: moderación de reseñas reportadas ---
 
 async function fetchReportedReviews() {
@@ -1352,6 +1591,7 @@ const SECTION_LOADERS = {
   'delivery-requests': fetchDeliveryRequests,
   'categories': fetchCategories,
   'coupons': fetchCoupons,
+  'pharmacies': loadPharmaciesSection,
   'stores-mod': fetchStoresForModeration,
   'products-mod': null, // se llena al buscar (setupProductSearch)
   'repartidores-mod': fetchRepartidoresForModeration,
@@ -1431,6 +1671,7 @@ function initAdminPage() {
   document.getElementById('btn-refresh-metrics').addEventListener('click', loadGlobalMetrics);
   document.getElementById('btn-refresh-categories').addEventListener('click', fetchCategories);
   document.getElementById('btn-refresh-coupons').addEventListener('click', fetchCoupons);
+  document.getElementById('btn-refresh-pharmacies').addEventListener('click', loadPharmaciesSection);
   document.getElementById('btn-refresh-stores-mod').addEventListener('click', fetchStoresForModeration);
   document.getElementById('btn-refresh-repartidores-mod').addEventListener('click', fetchRepartidoresForModeration);
   document.getElementById('btn-refresh-proofs').addEventListener('click', fetchPendingProofsAdmin);
@@ -1442,6 +1683,7 @@ function initAdminPage() {
 
   setupCategoryForm();
   setupCouponForm();
+  setupPharmacyForms();
   setupProductSearch();
   setupSectionNav();
 
@@ -1459,6 +1701,7 @@ function initAdminPage() {
 // que van a fallar.
 const MODERADOR_HIDDEN_SECTIONS = [
   'seller-requests', 'delivery-requests', 'metrics', 'categories', 'coupons',
+  'pharmacies',
   'stores-mod', 'products-mod', 'repartidores-mod', 'proofs',
   'revocations', 'error-logs', 'audit-log',
 ];

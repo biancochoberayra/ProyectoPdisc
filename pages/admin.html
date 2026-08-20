@@ -67,6 +67,9 @@
               <button type="button" class="admin-nav__item" data-target="coupons">
                 <i class="fa-solid fa-ticket" aria-hidden="true"></i><span>Cupones</span>
               </button>
+              <button type="button" class="admin-nav__item" data-target="pharmacies">
+                <i class="fa-solid fa-prescription-bottle-medical" aria-hidden="true"></i><span>Farmacias</span>
+              </button>
             </div>
 
             <div class="admin-nav__group">
@@ -280,6 +283,100 @@
                         </tr>
                       </thead>
                       <tbody id="coupons-tbody"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+
+              <!-- ===== Farmacias de turno (A113-261) ===== -->
+              <!-- Dos cosas separadas a propósito: los datos de la farmacia
+                   cambian una vez por año, el turno cambia cada semana. -->
+              <section class="admin-section" data-section="pharmacies">
+                <div class="admin-section__head">
+                  <div>
+                    <h2 class="admin-section__title">Farmacias de turno</h2>
+                    <p class="admin-section__subtitle">Cargá las farmacias una vez y después asignales el turno de cada día. Si no hay turno cargado, la página pública lo dice — nunca muestra una farmacia cualquiera.</p>
+                  </div>
+                  <button class="admin-btn admin-btn--ghost" id="btn-refresh-pharmacies"><i class="fa-solid fa-rotate-right"></i> Refrescar</button>
+                </div>
+
+                <h3 style="font-size: 1rem; margin: 0 0 0.5rem;">1. Turnos de los próximos días</h3>
+                <form class="admin-inline-form" id="shift-form">
+                  <div class="form-group">
+                    <label for="shift-pharmacy">Farmacia</label>
+                    <select id="shift-pharmacy" required></select>
+                  </div>
+                  <div class="form-group">
+                    <label for="shift-date">Fecha del turno</label>
+                    <input type="date" id="shift-date" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="shift-opens">Abre</label>
+                    <input type="time" id="shift-opens" value="08:00" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="shift-closes">Cierra (día siguiente)</label>
+                    <input type="time" id="shift-closes" value="08:00" required />
+                  </div>
+                  <button type="submit" class="action-btn btn-approve"><i class="fa-solid fa-plus"></i> Asignar turno</button>
+                </form>
+                <div class="admin-card" style="margin-bottom: 1.5rem;">
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Farmacia</th>
+                          <th>Horario</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody id="shifts-tbody"></tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <h3 style="font-size: 1rem; margin: 0 0 0.5rem;">2. Farmacias registradas</h3>
+                <form class="admin-inline-form" id="pharmacy-form">
+                  <div class="form-group">
+                    <label for="pharmacy-name">Nombre</label>
+                    <input type="text" id="pharmacy-name" placeholder="Farmacia San Martín" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="pharmacy-address">Dirección</label>
+                    <input type="text" id="pharmacy-address" placeholder="Mitre 1247" required />
+                  </div>
+                  <div class="form-group">
+                    <label for="pharmacy-phone">Teléfono</label>
+                    <input type="text" id="pharmacy-phone" placeholder="3329 48-2210" />
+                  </div>
+                  <div class="form-group">
+                    <label for="pharmacy-whatsapp">WhatsApp</label>
+                    <input type="text" id="pharmacy-whatsapp" placeholder="5493329482210" />
+                  </div>
+                  <div class="form-group">
+                    <label for="pharmacy-pharmacist">Farmacéutico/a</label>
+                    <input type="text" id="pharmacy-pharmacist" placeholder="Farm. Lucía Ferrari" />
+                  </div>
+                  <div class="form-group">
+                    <label for="pharmacy-insurances">Obras sociales</label>
+                    <input type="text" id="pharmacy-insurances" placeholder="PAMI, IOMA, OSDE" />
+                  </div>
+                  <button type="submit" class="action-btn btn-approve"><i class="fa-solid fa-plus"></i> Agregar farmacia</button>
+                </form>
+                <div class="admin-card">
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Nombre</th>
+                          <th>Dirección</th>
+                          <th>Contacto</th>
+                          <th>Estado</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody id="pharmacies-tbody"></tbody>
                     </table>
                   </div>
                 </div>
