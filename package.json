@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:local": "vite build --base=./ --outDir dist-local --emptyOutDir",
     "preview": "vite preview",
     "db:start": "supabase start",
     "db:stop": "supabase stop",

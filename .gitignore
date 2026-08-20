@@ -11,3 +11,9 @@ context.md
 # publicaciones.png, etc). La barra inicial ancla la regla a la raiz: las
 # imagenes del sitio viven en Assets/images/ y public/, y no se ven afectadas.
 /*.png
+
+# Build local con rutas relativas (npm run build:local). Es SOLO para poder
+# abrir el sitio con Live Server o a mano; el build que se versiona y el que
+# despliega Vercel siguen siendo `dist/` con rutas absolutas. No se versiona:
+# es una copia derivada que cada uno regenera cuando la necesita.
+/dist-local/
