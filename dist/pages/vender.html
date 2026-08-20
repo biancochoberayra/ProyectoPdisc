@@ -9,7 +9,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
       /* F5-09: acento propio del "modo vendedor" — un tono más saturado y
@@ -463,15 +463,20 @@
         .pub-count { margin-left: 0; width: 100%; }
       }
     </style>
-    <script type="module" crossorigin src="/assets/vender-CTP1x84z.js"></script>
+    <script type="module" crossorigin src="/assets/vender-CpchRH44.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/speed-insights-DFDjlVMP.js">
     <link rel="modulepreload" crossorigin href="/assets/nav-utils-Bc-WWpNs.js">
     <link rel="modulepreload" crossorigin href="/assets/support-utils-BxE69RLA.js">
     <link rel="modulepreload" crossorigin href="/assets/validation-utils-BzZAHDfL.js">
+    <link rel="stylesheet" crossorigin href="/assets/a11y-B2aK6CFr.css">
     <link rel="stylesheet" crossorigin href="/assets/auth-Xp8Z9a0l.css">
     <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
     <!-- Loading screen -->
     <div id="loading-screen" class="auth-loading-screen">
       <div class="auth-loading-spinner"></div>
@@ -500,11 +505,11 @@
         </div>
       </nav>
 
-      <main>
+      <main id="contenido-principal" tabindex="-1">
         <!-- Vista de Registro (card centrada, sin sidebar) -->
         <div id="register-view" class="vender-container">
             <div class="vender-header">
-              <h1>Empezá a vender en Baradero</h1>
+              <h2>Empezá a vender en Baradero</h2>
               <p>Completá los datos de tu comercio y sumate a la red local.</p>
             </div>
             <form id="seller-form">
@@ -573,12 +578,13 @@
           </aside>
 
           <div class="mc-content">
+      <h1 class="sr-only">Panel de mi comercio</h1>
             <div id="mc-pending-notice" style="display:none; background: var(--bl-surface-alt); padding: 1.5rem; border-radius: var(--bl-radius-md); border: 1px solid var(--bl-border);"></div>
 
             <!-- === Resumen === -->
             <section class="mc-section" data-section="resumen">
               <div class="vender-header" style="text-align:left; margin-bottom:1.5rem;">
-                <h1 style="font-size:1.5rem;">Resumen</h1>
+                <h2 style="font-size:1.5rem;">Resumen</h2>
                 <p>Bienvenido, <strong id="welcome-store-name">tu comercio</strong></p>
               </div>
 
@@ -681,7 +687,7 @@
             <!-- Mis cupones (F12-03): a diferencia de los cupones globales del admin, estos solo aplican a mi tienda -->
             <!-- Oculto para empleados (F12-16) -- decisión financiera/de marketing, solo el dueño -->
             <div class="pub-wrap" id="my-coupons-section">
-              <div class="pub-header"><h1 class="pub-title">Mis cupones</h1></div>
+              <div class="pub-header"><h2 class="pub-title">Mis cupones</h2></div>
               <form id="my-coupon-form" style="background: var(--bl-surface-alt); padding: 1.5rem; border-radius: var(--bl-radius-md); border: 1px solid var(--bl-border); margin-bottom: 1.5rem; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: end;">
                 <div>
                   <label class="form-label" for="my-coupon-code">Código</label>
@@ -706,7 +712,7 @@
             <!-- Empleados (F12-16): cuentas adicionales que pueden operar este comercio -->
             <!-- Oculto para empleados -- solo el dueño gestiona quién tiene acceso -->
             <div class="pub-wrap" id="store-staff-section">
-              <div class="pub-header"><h1 class="pub-title">Empleados</h1></div>
+              <div class="pub-header"><h2 class="pub-title">Empleados</h2></div>
               <p style="color: var(--bl-text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
                 Dale acceso a este panel a otra cuenta ya registrada en Baradero Local (puede gestionar productos y pedidos, no puede editar el perfil del comercio, los cupones ni la lista de empleados).
               </p>
@@ -727,13 +733,13 @@
             <section class="mc-section" data-section="ventas" hidden>
             <div class="pub-wrap">
               <div class="pub-header">
-                <h1 class="pub-title">Ventas</h1>
+                <h2 class="pub-title">Ventas</h2>
               </div>
 
               <div class="pub-toolbar" id="ventas-toolbar">
                 <div class="pub-search">
                   <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="search" id="ventas-search" placeholder="Buscar por N° de pedido o teléfono" autocomplete="off" />
+                  <input type="search" id="ventas-search" aria-label="Buscar ventas por número de pedido o teléfono" placeholder="Buscar por N° de pedido o teléfono" autocomplete="off" />
                 </div>
                 <div class="pub-chips">
                   <button type="button" class="pub-chip is-active" data-status="all">Todas</button>
@@ -782,7 +788,7 @@
             <section class="mc-section" data-section="pagos" hidden>
             <div class="pub-wrap">
               <div class="pub-header">
-                <h1 class="pub-title">Pagos por confirmar</h1>
+                <h2 class="pub-title">Pagos por confirmar</h2>
               </div>
               <div class="pub-list" id="pending-payments-container">
                 <!-- Cargado con JS -->
@@ -797,7 +803,7 @@
             <section class="mc-section" data-section="envios" hidden>
             <div class="pub-wrap">
               <div class="pub-header">
-                <h1 class="pub-title">Envíos en curso</h1>
+                <h2 class="pub-title">Envíos en curso</h2>
               </div>
               <div class="pub-list" id="shipments-container">
                 <!-- Cargado con JS -->
@@ -810,7 +816,7 @@
             <section class="mc-section" data-section="publicaciones" hidden>
             <div class="pub-wrap">
               <div class="pub-header">
-                <h1 class="pub-title">Publicaciones</h1>
+                <h2 class="pub-title">Publicaciones</h2>
                 <div class="pub-publish">
                   <button type="button" class="pub-publish__btn" id="btn-publish-menu" aria-haspopup="true" aria-expanded="false">
                     <i class="fa-solid fa-plus"></i> Publicar <i class="fa-solid fa-chevron-down" style="font-size: 0.75rem;"></i>
@@ -826,7 +832,7 @@
               <div class="pub-toolbar" id="pub-toolbar">
                 <div class="pub-search">
                   <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="search" id="pub-search" placeholder="Buscar en mis publicaciones" autocomplete="off" />
+                  <input type="search" id="pub-search" aria-label="Buscar en mis publicaciones" placeholder="Buscar en mis publicaciones" autocomplete="off" />
                 </div>
                 <div class="pub-chips">
                   <button type="button" class="pub-chip is-active" data-status="all">Todas</button>
@@ -863,7 +869,7 @@
                       <span class="pubform__drop-main">Elegí las fotos o arrastralas acá</span>
                       <span class="pubform__hint">JPG, PNG o WEBP · hasta 5 MB cada una</span>
                     </div>
-                    <input type="file" id="prod-images" accept="image/*" multiple hidden />
+                    <input type="file" id="prod-images" accept="image/*" multiple hidden aria-label="Elegir fotos del producto" />
                     <div class="pubform__gallery" id="prod-gallery"></div>
                   </fieldset>
 

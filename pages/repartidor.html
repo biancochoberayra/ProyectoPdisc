@@ -10,6 +10,7 @@
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="../Assets/styles/a11y.css" />
     <link rel="stylesheet" href="../Assets/styles/home.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
@@ -154,6 +155,10 @@
     <link rel="stylesheet" href="../Assets/styles/auth.css" />
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
     <!-- Loading screen -->
     <div id="loading-screen" class="auth-loading-screen">
       <div class="auth-loading-spinner"></div>
@@ -179,13 +184,14 @@
         </div>
       </nav>
 
-      <main>
+      <main id="contenido-principal" tabindex="-1">
         <div class="vender-container">
+      <h1 class="sr-only">Panel de repartidor</h1>
 
           <!-- Vista de Registro -->
           <div id="register-view">
             <div class="vender-header">
-              <h1>Sumate como repartidor</h1>
+              <h2>Sumate como repartidor</h2>
               <p>Completá tus datos de contacto y vehículo. El equipo de Baradero Local revisa cada solicitud.</p>
             </div>
             <form id="delivery-form">
@@ -217,7 +223,7 @@
           <div id="status-view">
             <i class="fa-regular fa-clock" id="status-icon"></i>
             <div class="vender-header">
-              <h1 id="status-title">Solicitud en revisión</h1>
+              <h2 id="status-title">Solicitud en revisión</h2>
               <p id="status-text">Te avisamos apenas el equipo la revise.</p>
             </div>
             <button type="button" class="btn-outline" id="btn-back-home">Volver al inicio</button>
@@ -226,7 +232,7 @@
           <!-- Panel del repartidor ya aprobado -->
           <div id="dashboard-view">
             <div class="vender-header">
-              <h1>Panel de Repartidor</h1>
+              <h2>Panel de Repartidor</h2>
               <p>Elegí un pedido disponible para repartir.</p>
               <p id="repartidor-rating" style="font-weight: 600; margin-top: 0.25rem;"></p>
             </div>

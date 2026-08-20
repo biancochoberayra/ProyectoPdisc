@@ -20,6 +20,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="../Assets/styles/a11y.css" />
     <link rel="stylesheet" href="../Assets/styles/home.css" />
     <link rel="stylesheet" href="../Assets/styles/carrito.css" />
     <style>
@@ -109,6 +110,10 @@
     </style>
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
     <!-- ====== BARRA DE NAVEGACIÓN ====== -->
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
       <div class="navbar__top">
@@ -133,7 +138,7 @@
       <div class="navbar__search-wrapper">
         <div class="navbar__search">
           <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="search" id="search-input" class="navbar__search-input" placeholder="¿Qué estás buscando?" autocomplete="off" />
+          <input type="search" id="search-input" class="navbar__search-input" aria-label="Buscar productos" placeholder="¿Qué estás buscando?" autocomplete="off" />
         </div>
       </div>
     </nav>
@@ -143,7 +148,8 @@
       <div class="category-bar__inner" id="category-bar-inner"></div>
     </div>
 
-    <main>
+    <main id="contenido-principal" tabindex="-1">
+      <h1 class="sr-only" id="page-h1">Cargando producto</h1>
       <div class="product-page" id="product-container">
         <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: #64748b;">
           Cargando producto...

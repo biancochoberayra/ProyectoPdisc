@@ -1,0 +1,127 @@
+/* Accesibilidad — base compartida por TODAS las páginas.
+ *
+ * Se carga desde cada .html antes de las hojas específicas. Existe por un
+ * problema concreto: `.sr-only` estaba definida SOLO en `auth.css`, pero la
+ * usaban `home.html`, `comercios.html` y `search.html`, que no cargan ese
+ * archivo — así que esos textos pensados para el lector de pantalla se veían
+ * en la pantalla. La definición de `auth.css` se deja donde está (no rompe
+ * nada, es idéntica); acá queda la copia que sí llega a todas las páginas.
+ *
+ * El objetivo de este archivo es TalkBack (Android). Todo lo de acá afecta lo
+ * que el lector anuncia o cómo se navega, no la estética.
+ */
+
+/* ------------------------------------------------------------------ */
+/* Texto solo para lectores de pantalla                                */
+/* ------------------------------------------------------------------ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Saltar al contenido                                                 */
+/*
+ * Primer elemento enfocable de cada página. Invisible hasta que recibe foco.
+ * Sin esto, TalkBack obliga a recorrer navbar + buscador + barra de
+ * categorías (más de 20 elementos) en CADA página antes de llegar al
+ * contenido. Es la mejora que más tiempo ahorra de todo este archivo.
+ */
+/* ------------------------------------------------------------------ */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0.5rem;
+  z-index: 9999;
+  padding: 0.75rem 1.25rem;
+  background: var(--bl-primary, #284175);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 0 0 var(--bl-radius-md, 0.5rem) var(--bl-radius-md, 0.5rem);
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 0;
+  outline: 3px solid #fff;
+  outline-offset: -6px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Foco visible                                                        */
+/*
+ * `:focus-visible` en vez de `:focus` para no dibujar el anillo cuando se
+ * toca con el dedo o se hace click con el mouse — solo cuando se navega por
+ * teclado o con el foco de TalkBack, que es cuando hace falta verlo.
+ */
+/* ------------------------------------------------------------------ */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--bl-primary, #284175);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Sobre fondos oscuros (navbar, footer) el azul de marca no contrasta:
+   ahí el anillo va blanco. */
+.navbar a:focus-visible,
+.navbar button:focus-visible,
+.footer a:focus-visible,
+.footer button:focus-visible {
+  outline-color: #fff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Blanco táctil mínimo                                                */
+/*
+ * WCAG 2.5.5 pide 44x44 px. Los botones circulares del navbar y varios
+ * botones-ícono quedaban por debajo, lo que en un celular se traduce en
+ * "toqué y no pasó nada" — molesto para cualquiera, bloqueante para alguien
+ * con motricidad reducida. Se agranda el área tocable sin cambiar el tamaño
+ * visual, con un pseudo-elemento.
+ */
+/* ------------------------------------------------------------------ */
+.navbar__action-circle,
+.product-card__wishlist {
+  position: relative;
+}
+
+.navbar__action-circle::after,
+.product-card__wishlist::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  /* Solo amplía el área de toque; no se ve ni bloquea nada debajo. */
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Respetar "reducir movimiento"                                       */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

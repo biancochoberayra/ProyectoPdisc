@@ -248,7 +248,7 @@ function buildCard(product) {
   imageDiv.appendChild(img);
   const wishBtn = document.createElement('button');
   wishBtn.className = 'product-card__wishlist';
-  wishBtn.setAttribute('aria-label', 'Agregar a favoritos');
+  wishBtn.setAttribute('aria-label', `Agregar ${product.title} a favoritos`);
   const heartIcon = document.createElement('i');
   heartIcon.className = 'fa-regular fa-heart';
   wishBtn.appendChild(heartIcon);
@@ -290,6 +290,9 @@ function buildCard(product) {
     addBtn.style.cssText = 'opacity: 0.5; cursor: not-allowed;';
     addBtn.title = 'Producto sin stock';
   }
+  addBtn.setAttribute('aria-label', outOfStock
+    ? `${product.title} sin stock`
+    : `Agregar ${product.title} al carrito`);
   addBtn.append(outOfStock ? ' Sin stock' : ' Agregar');
   body.appendChild(addBtn);
 

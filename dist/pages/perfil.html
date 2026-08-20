@@ -11,18 +11,23 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script type="module" crossorigin src="/assets/perfil-CSeDeAsA.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script type="module" crossorigin src="/assets/perfil-DloPHXHd.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/speed-insights-DFDjlVMP.js">
     <link rel="modulepreload" crossorigin href="/assets/nav-utils-Bc-WWpNs.js">
     <link rel="modulepreload" crossorigin href="/assets/hints-utils-d3wNflvh.js">
     <link rel="modulepreload" crossorigin href="/assets/reviews-utils-CivoFhuJ.js">
     <link rel="modulepreload" crossorigin href="/assets/support-utils-BxE69RLA.js">
     <link rel="stylesheet" crossorigin href="/assets/perfil-DKuWVzRP.css">
+    <link rel="stylesheet" crossorigin href="/assets/a11y-B2aK6CFr.css">
     <link rel="stylesheet" crossorigin href="/assets/carrito-BdyzhhAq.css">
     <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
     <!-- ====== BARRA DE NAVEGACIÓN (Consistente con el resto del sitio) ====== -->
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
       <div class="navbar__top">
@@ -90,7 +95,8 @@
       </aside>
 
       <!-- Panel Principal -->
-      <main class="profile-content">
+      <main id="contenido-principal" tabindex="-1" class="profile-content">
+        <h1 class="sr-only">Mi perfil</h1>
         
         <!-- ======================= -->
         <!-- PESTAÑA: MIS DATOS      -->
@@ -225,7 +231,7 @@
               <button type="button" id="fav-subtab-products" class="fav-subtab-btn fav-subtab-btn--active" data-fav-target="favoritos-container">Productos</button>
               <button type="button" id="fav-subtab-stores" class="fav-subtab-btn" data-fav-target="favoritos-stores-container">Comercios</button>
             </div>
-            <input type="text" id="fav-filter-input" class="form-input" placeholder="Buscar en mis favoritos..." style="margin-bottom: 1rem;" />
+            <input type="text" id="fav-filter-input" class="form-input" aria-label="Filtrar mis favoritos" placeholder="Buscar en mis favoritos..." style="margin-bottom: 1rem;" />
             <div id="favoritos-container" class="favoritos-grid">
               <!-- Renderizado por JS -->
               <p style="color: var(--bl-perfil-text-sec);">Cargando tus favoritos...</p>

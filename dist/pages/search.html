@@ -19,17 +19,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script type="module" crossorigin src="/assets/search-a5g_scwL.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script type="module" crossorigin src="/assets/search-C1DvHCYO.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/speed-insights-DFDjlVMP.js">
     <link rel="modulepreload" crossorigin href="/assets/nav-utils-Bc-WWpNs.js">
     <link rel="modulepreload" crossorigin href="/assets/reviews-utils-CivoFhuJ.js">
     <link rel="modulepreload" crossorigin href="/assets/product-modal-DXCGA5UH.js">
     <link rel="stylesheet" crossorigin href="/assets/product-modal-hgIgZIpS.css">
+    <link rel="stylesheet" crossorigin href="/assets/a11y-B2aK6CFr.css">
     <link rel="stylesheet" crossorigin href="/assets/carrito-BdyzhhAq.css">
     <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
 
     <!-- ====== BARRA DE NAVEGACIÓN ====== -->
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
@@ -72,7 +77,7 @@
     </div>
 
     <!-- ====== CONTENIDO PRINCIPAL ====== -->
-    <main>
+    <main id="contenido-principal" tabindex="-1">
 
       <!-- Sección de Resultados de Búsqueda -->
 
@@ -137,8 +142,8 @@
 
           <div class="catalog-content">
             <div class="section-header">
-              <h2 class="results-title" id="catalog-title">Todos los productos</h2>
-              <span class="catalog-count" id="catalog-count"></span>
+              <h1 class="results-title" id="catalog-title">Todos los productos</h1>
+              <span class="catalog-count" id="catalog-count" role="status" aria-live="polite"></span>
             </div>
             <div class="active-filters" id="active-filters"></div>
 

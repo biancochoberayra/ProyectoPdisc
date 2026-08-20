@@ -20,11 +20,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="../Assets/styles/a11y.css" />
     <link rel="stylesheet" href="../Assets/styles/home.css" />
     <link rel="stylesheet" href="../Assets/styles/carrito.css" />
     <link rel="stylesheet" href="../Assets/styles/product-modal.css" />
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
 
     <!-- ====== BARRA DE NAVEGACIÓN ====== -->
     <nav class="navbar" role="navigation" aria-label="Navegación principal">
@@ -67,7 +72,7 @@
     </div>
 
     <!-- ====== CONTENIDO PRINCIPAL ====== -->
-    <main>
+    <main id="contenido-principal" tabindex="-1">
 
       <!-- Sección de Resultados de Búsqueda -->
 
@@ -132,8 +137,8 @@
 
           <div class="catalog-content">
             <div class="section-header">
-              <h2 class="results-title" id="catalog-title">Todos los productos</h2>
-              <span class="catalog-count" id="catalog-count"></span>
+              <h1 class="results-title" id="catalog-title">Todos los productos</h1>
+              <span class="catalog-count" id="catalog-count" role="status" aria-live="polite"></span>
             </div>
             <div class="active-filters" id="active-filters"></div>
 

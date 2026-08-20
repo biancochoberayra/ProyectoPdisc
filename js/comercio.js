@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (productsError) throw productsError;
 
     document.title = `${store.name} — Baradero Local`;
+    const pageH1 = document.getElementById('page-h1');
+    if (pageH1) pageH1.textContent = store.name;
 
     // --- Construir con DOM API (anti-XSS: nada de innerHTML con datos de la DB) ---
     mainContent.innerHTML = '';

@@ -32,6 +32,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (error || !product) throw error || new Error('Producto no encontrado');
 
     document.title = `${product.title} — Baradero Local`;
+    // El h1 (invisible) es lo que TalkBack anuncia al entrar y lo que usa
+    // para el salto por encabezados: sin esto queda en "Cargando producto".
+    const pageH1 = document.getElementById('page-h1');
+    if (pageH1) pageH1.textContent = product.title;
     
     const storeName = product.stores ? product.stores.name : 'Tienda';
     const storeId = product.stores ? product.stores.id : '';

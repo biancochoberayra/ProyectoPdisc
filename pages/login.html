@@ -11,9 +11,14 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="../Assets/styles/a11y.css" />
     <link rel="stylesheet" href="../Assets/styles/auth.css" />
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
     <!-- Loading screen (se oculta cuando el guard confirma que NO hay sesión) -->
     <div id="loading-screen" class="auth-loading-screen">
       <div class="auth-loading-spinner"></div>
@@ -22,7 +27,8 @@
 
     <!-- Contenido principal (oculto hasta que el guard lo habilite) -->
     <div id="main-content">
-      <main class="auth-layout">
+      <main id="contenido-principal" tabindex="-1" class="auth-layout">
+        <h1 class="sr-only">Iniciar sesión en Baradero Local</h1>
         <div class="auth-header">
           <div class="auth-brand-text">
             <span class="auth-brand-line">BARADERO</span>

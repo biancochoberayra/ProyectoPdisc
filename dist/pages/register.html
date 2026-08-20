@@ -10,12 +10,17 @@
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script type="module" crossorigin src="/assets/register-Bls3Nvc6.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script type="module" crossorigin src="/assets/register-C0AzpfxZ.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/speed-insights-DFDjlVMP.js">
+    <link rel="stylesheet" crossorigin href="/assets/a11y-B2aK6CFr.css">
     <link rel="stylesheet" crossorigin href="/assets/auth-Xp8Z9a0l.css">
   </head>
   <body>
+    <!-- Primer elemento enfocable: deja saltar navbar + buscador + barra de
+         categorias, que en TalkBack son mas de 20 pasos en cada pagina. -->
+    <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
     <!-- Loading screen -->
     <div id="loading-screen" class="auth-loading-screen">
       <div class="auth-loading-spinner"></div>
@@ -24,7 +29,7 @@
 
     <!-- Contenido principal -->
     <div id="main-content">
-      <main class="auth-layout">
+      <main id="contenido-principal" tabindex="-1" class="auth-layout">
         <div class="auth-header">
           <h1>Crear Cuenta</h1>
           <p>Registrate para poder comprar productos y unirte<br>a la comunidad de <strong>Baradero Local</strong></p>
