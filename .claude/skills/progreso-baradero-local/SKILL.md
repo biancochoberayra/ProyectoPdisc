@@ -39,6 +39,66 @@ después se construyó la página real sobre esa base.
 - **Pendiente real, y no es código**: las tablas están vacías. Falta cargar las farmacias de
   Baradero y definir **quién carga los turnos cada semana**. Sin eso la página se vuelve el mismo
   problema que vino a arreglar, más grande.
+## Carrito agrupado por comercio + selección por casilla (2026-08-16)
+Rama `feature/carrito-seleccion-por-comercio`. El carrito era una lista plana donde lo único que se
+podía hacer con un producto que no se quería comprar hoy era borrarlo. Ahora se agrupa por comercio,
+cada ítem tiene casilla, y lo destildado queda "pendiente" (sigue en el carrito, no se cobra).
+Decisiones del usuario: la selección **persiste** entre sesiones, un producto nuevo entra **tildado**,
+"Vaciar carrito" sigue vaciando **todo** pero con confirmación, y las ayudas se pueden apagar.
+
+- **`selected` por ítem, con `undefined` = tildado.** Es el punto más importante de compatibilidad:
+  los carritos ya guardados (localStorage y `user_carts`) no tienen el campo, y tratarlos como
+  pendientes les vaciaría el total a cualquiera que ya tuviera cosas cargadas. Solo un `false`
+  explícito deja algo afuera (`isItemSelected` en `js/cart-utils.js`). La persistencia no necesitó
+  camino nuevo: `saveCart()` ya escribe localStorage + `user_carts.items` (jsonb), y el flag viaja
+  adentro del mismo objeto. `validateCartFreshness` conserva el flag porque hace `{ ...item }`.
+- **El filtro por comercio SOLO oculta.** `storeFilter` es una variable de vista: agrega
+  `.is-filtered-out` (display:none) a los grupos que no coinciden y **nunca** escribe `selected` ni
+  llama a `saveCart`. Los grupos ocultos igual se renderizan, así los índices de los botones
+  +/-/borrar (que son índices del array del carrito) siguen siendo válidos.
+- **La trampa que se cubrió a propósito:** con un filtro activo se puede tener seleccionado algo de
+  otro comercio que no se ve en pantalla. El resumen lo dice explícito
+  (`#cart-hidden-note`: "Ojo: hay N productos seleccionados de otros comercios que el filtro «X» te
+  está ocultando. Igual se cobran."). Sin eso es facilísimo pagar de más.
+- **Checkout: `payload = selectedItems.map(...)`, no `currentCart`.** Era el bug de plata real: si
+  se mandaban los pendientes a `create_order`, se le cobraban al cliente productos que decidió no
+  comprar. Además se agregó `clearPurchasedFromCart()` (cart-utils) que reemplaza a `clearCart()`
+  después de pagar — vaciar todo borraría los pendientes, que son una decisión explícita del
+  usuario. Se usa igual en `js/perfil.js` (retorno de Mercado Pago).
+- **Envío por comercio:** `calculateShippingByStore` ahora recibe solo lo tildado, y cada grupo
+  muestra un chip con su estado ("Envío gratis" / "Te faltan $X para envío gratis" / "Todo
+  pendiente"). **Cuarto estado agregado, "Retirás en el local"**: con `deliveryMethod === 'pickup'`
+  no se cobra envío por nada, hablar de umbrales ahí sería un dato falso.
+- **Agrupación por NOMBRE de comercio, no por `store_id`.** El id real recién llega con
+  `validateCartFreshness` (async): usarlo como clave haría que los grupos —y el filtro activo—
+  cambiaran de identidad a mitad de la carga. El `store_id` se sigue usando para resolver la config
+  de envío de cada grupo.
+- **Guía de ayuda: `js/hints-utils.js` (módulo nuevo, reusable).** No es un sistema de
+  notificaciones nuevo: reusa el mismo `#toast` de `showToast`/`showCartToast`. Textos centralizados
+  en `CART_HINTS` (los dos del ítem son literales del usuario: "Producto en pendiente, este no se
+  agregará a su compra" / "Producto agregado, este se tendrá en cuenta en su compra"), más los de
+  casilla maestra y chips de filtro.
+- **Preferencia de ayudas: sigue a la cuenta** (`profiles.cart_hints_enabled`, **migración 66,
+  PENDIENTE de aplicar**) con cache en `localStorage.bl_cart_hints` para que funcione antes de que
+  resuelva el fetch del perfil y para invitados (default: activada). Toggle en Perfil → Mis datos.
+  **Los números 61-65 están reservados por `feature/logistica-terceros` (sin mergear).**
+- **Vaciar carrito:** modal propio (`.bl-confirm-*` en `carrito.css`), no `confirm()` nativo. Texto
+  literal pedido por el usuario, foco atrapado entre los 2 botones, arranca en "Cancelar" (la opción
+  segura), Escape cierra y devuelve el foco al botón que lo abrió.
+- **El badge del navbar sigue contando TODO** (tildado o no): un pendiente sigue siendo algo que el
+  usuario tiene guardado. Por eso el handler de las casillas no llama a `updateCartBadge()`.
+- **Verificado en el navegador con datos reales** (dev server 5188, 3 comercios en el carrito):
+  agrupación y chips; destildar el Vino de "Bebidas La Esquina" bajó ese grupo de $5.700 a $1.200 y
+  el chip pasó de "Envío gratis" a "Te faltan $3.800", con el envío total subiendo de $350 a $700;
+  casilla maestra en `indeterminate`; filtro ocultando 2 grupos sin tocar ninguna casilla y con el
+  total intacto; F5 conservando `selected:false`; borrar el último producto del comercio filtrado
+  devuelve el filtro a "Todos"; modal (Escape/Cancelar/Confirmar); ayudas apagadas = sin toast pero
+  la acción se aplica igual; mobile 375px sin desborde horizontal, chips scrolleando y casilla
+  arriba a la izquierda. `npm run build` sin warnings. Consola: solo el CSP de Vercel Speed
+  Insights (preexistente).
+- **Sin verificar:** el checkout de punta a punta y el toggle del perfil logueado (requieren sesión
+  real; `perfil.html` redirige a login sin cuenta), y la persistencia de la preferencia en la base
+  (la migración 66 no se aplicó, por pedido del usuario).
 ## Arreglo del flujo de registro/login (2026-08-15)
 Rama `fix-flujo-registro-login`. El usuario reportó tres cosas: (1) después de registrarse la app
 igual le pedía iniciar sesión, (2) el registro no pedía repetir la contraseña, (3) los Términos y

@@ -564,3 +564,47 @@ body {
   background: var(--bl-perfil-primary-hover);
   transform: translateY(-1px);
 }
+
+/* ===========================================================
+   PREFERENCIAS (Mis datos) — ej. ayudas del carrito
+   =========================================================== */
+
+.pref-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pref-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.pref-toggle input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--bl-perfil-primary);
+  cursor: pointer;
+}
+
+.pref-toggle__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pref-toggle__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--bl-perfil-text-main);
+}
+
+.pref-toggle__desc {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--bl-perfil-text-sec);
+}

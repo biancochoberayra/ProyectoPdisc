@@ -95,10 +95,50 @@ export async function initCartSync() {
 }
 
 /**
- * Limpiar el carrito
+ * Limpiar el carrito.
+ * El vaciado también viaja a la nube: los 3 llamadores son "ya se compró
+ * esto", y si `user_carts` conservara los ítems viejos, el `initCartSync` de
+ * la próxima pestaña se los devolvería al usuario como si nunca hubiera
+ * pagado.
  */
 export function clearCart() {
   localStorage.removeItem(CART_KEY);
+  pushCartToCloud([]).catch((err) => console.error('Error al sincronizar el carrito:', err));
+}
+
+/**
+ * Selección por ítem (carrito agrupado por comercio).
+ *
+ * `undefined` cuenta como tildado a propósito: los carritos que ya estaban
+ * guardados (localStorage o `user_carts`) antes de esta feature no tienen el
+ * campo `selected`, y tratarlos como "pendientes" les vaciaría el total de
+ * golpe a quien ya tenía cosas cargadas. Solo un `false` explícito —el que
+ * escribe el usuario al destildar— deja un ítem afuera de la compra.
+ * @param {{selected?: boolean}} item
+ */
+export function isItemSelected(item) {
+  return item?.selected !== false;
+}
+
+/** Solo los ítems que el usuario dejó tildados (los que se van a cobrar). */
+export function getSelectedItems(cart) {
+  return (cart || []).filter(isItemSelected);
+}
+
+/**
+ * Vacía del carrito **solo lo que se compró**, dejando los pendientes.
+ * Reemplaza al `clearCart()` que se usaba al confirmar un pago: ahora que un
+ * ítem destildado significa "esto lo dejo para después", borrarlo junto con
+ * la compra sería tirar una decisión explícita del usuario. Si no quedó nada
+ * pendiente el efecto es idéntico al de vaciar todo.
+ */
+export function clearPurchasedFromCart() {
+  const pending = getCart().filter((item) => !isItemSelected(item));
+  if (pending.length === 0) {
+    clearCart();
+    return;
+  }
+  saveCart(pending);
 }
 
 /**
@@ -370,8 +410,13 @@ export function initCartButtons() {
           return;
         }
         existing.qty++;
+        // Si estaba en pendiente y lo vuelve a agregar, es que ahora sí lo
+        // quiere comprar — dejarlo destildado haría que sumar unidades no
+        // moviera el total y pareciera que el botón no hizo nada.
+        existing.selected = true;
       } else {
-        cart.push({ id, name, shop, price, priceOld: priceOld || null, image: imgSrc, qty: 1 });
+        // Un producto recién agregado entra tildado (decisión de producto).
+        cart.push({ id, name, shop, price, priceOld: priceOld || null, image: imgSrc, qty: 1, selected: true });
       }
 
       saveCart(cart);

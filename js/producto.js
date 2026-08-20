@@ -185,15 +185,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (existing) {
         existing.qty++;
+        existing.selected = true; // vuelve a entrar en la compra (ver cart-utils)
       } else {
-        cart.push({ 
-          id: product.id, 
-          name: product.title, 
-          shop: storeName, 
+        cart.push({
+          id: product.id,
+          name: product.title,
+          shop: storeName,
           price: product.price,
-          priceOld: null, 
-          image: imgUrl, 
-          qty: 1 
+          priceOld: null,
+          image: imgUrl,
+          qty: 1,
+          selected: true // un producto recién agregado entra tildado
         });
       }
 

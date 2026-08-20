@@ -40,18 +40,23 @@
   Las tablas quedan **vacías a propósito**: no hay seed porque no tenemos los datos reales de las
   farmacias de Baradero, e inventarlos sería repetir el bug que este módulo vino a arreglar.
 
+- `db/schema/66_cart_hints_preference.sql` — **aplicada el 2026-08-18** vía `apply_migration`
+  (nombre en Supabase: `cart_hints_preference`). Agrega `profiles.cart_hints_enabled`
+  (boolean not null default true), la preferencia "Mostrar ayudas en el carrito" que se edita
+  desde Perfil → Mis datos. Verificado post-aplicación: la columna existe y los 15 perfiles
+  quedaron con las ayudas activas por el default. Sin RLS ni funciones nuevas
+  (`profiles_select_own`/`profiles_update_own` ya cubren la columna).
+
 - `db/schema/60_seller_request_multi_category.sql` — **aplicada el 2026-08-16** vía
   `apply_migration` (nombre en Supabase: `seller_request_multi_category`). Agrega
   `seller_requests.category_slugs` (array) para P2-10. Verificado post-aplicación: la columna
   existe y el backfill corrió sobre 2 de las 3 solicitudes (la tercera es la fila vieja de
-  prueba con `category_slug` en null, sin rubro que copiar — esperado, mismo caso que
-  documenta `16_input_validation_constraints.sql`).
+  prueba con `category_slug` en null, sin rubro que copiar).
 
-> **Ojo si trabajás en otra rama:** hay migraciones pendientes que **no viven en `main`**.
-> `feature/logistica-terceros` trae las **61 a 65** (logística de terceros) y
-> `feature/carrito-seleccion-por-comercio` trae la **66** (preferencia de ayudas del carrito).
-> Cada una está documentada en el `MIGRACIONES_PENDIENTES.md` de su propia rama. Los números
-> 61-65 y 66 ya están reservados: no los reutilices.
+> **Numeración — no reusar:** 61 a 65 están tomadas por `feature/logistica-terceros` (todavía
+> **sin aplicar**), la 66 y la 67 ya están aplicadas. La próxima migración nueva arranca en la **68**.
+
+---
 
 Antes de esta entrada: verificado contra la base real (`list_migrations`, proyecto
 `otzhdwuaffcplrveuadc`) el 2026-07-23: **todas las migraciones 01 a 59 ya

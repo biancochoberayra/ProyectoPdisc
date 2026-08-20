@@ -661,6 +661,7 @@ function bindModalEvents(overlay, data) {
 
     if (existing) {
       existing.qty += qty;
+      existing.selected = true; // vuelve a entrar en la compra (ver cart-utils)
     } else {
       cart.push({
         id: data.id,
@@ -669,7 +670,8 @@ function bindModalEvents(overlay, data) {
         price: data.price,
         priceOld: priceOld || null,
         image: data.imgSrc,
-        qty
+        qty,
+        selected: true // un producto recién agregado entra tildado
       });
     }
 
@@ -699,6 +701,7 @@ function bindModalEvents(overlay, data) {
 
     if (existing) {
       existing.qty += qty;
+      existing.selected = true; // "Comprar ahora" nunca debe caer en pendiente
     } else {
       cart.push({
         id: data.id,
@@ -707,7 +710,8 @@ function bindModalEvents(overlay, data) {
         price: data.price,
         priceOld: priceOld || null,
         image: data.imgSrc,
-        qty
+        qty,
+        selected: true
       });
     }
 

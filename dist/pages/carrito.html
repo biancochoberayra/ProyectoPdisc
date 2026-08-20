@@ -15,10 +15,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script type="module" crossorigin src="/assets/carrito-C-2GuYwT.js"></script>
+    <script type="module" crossorigin src="/assets/carrito-BtLUQrJZ.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/speed-insights-DFDjlVMP.js">
-    <link rel="modulepreload" crossorigin href="/assets/nav-utils-O4_6O7mL.js">
-    <link rel="stylesheet" crossorigin href="/assets/carrito-Bwp3lmXO.css">
+    <link rel="modulepreload" crossorigin href="/assets/nav-utils-Bc-WWpNs.js">
+    <link rel="modulepreload" crossorigin href="/assets/hints-utils-d3wNflvh.js">
+    <link rel="stylesheet" crossorigin href="/assets/carrito-BdyzhhAq.css">
     <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
   </head>
   <body>
@@ -72,15 +73,10 @@
 
           <!-- Tabla con productos -->
           <div id="cart-filled">
-            <div class="cart-table__header">
-              <span>Producto</span>
-              <span>Precio</span>
-              <span>Items</span>
-              <span>Subtotal</span>
-              <span></span>
-            </div>
+            <!-- Filtro por comercio: SOLO oculta filas, nunca cambia la selección -->
+            <div class="cart-filter" id="cart-filter" role="group" aria-label="Filtrar el carrito por comercio"></div>
 
-            <!-- Filas dinámicas -->
+            <!-- Grupos dinámicos (uno por comercio) -->
             <div id="cart-items"></div>
 
             <!-- Barra de acciones -->
@@ -157,9 +153,18 @@
 
           <!-- Totales -->
           <div class="cart-summary__totals">
+            <!-- Estos 4 bloques hablan SIEMPRE del carrito completo, nunca de
+                 lo que el filtro esté mostrando -->
             <div class="cart-summary__row">
               <span class="cart-summary__row-label" id="cart-count">0 productos</span>
             </div>
+
+            <div class="cart-summary__row">
+              <span class="cart-summary__row-label" id="cart-stores-count"></span>
+            </div>
+
+            <p class="cart-summary__note" id="cart-pending-note" style="display: none;"></p>
+            <p class="cart-summary__note cart-summary__note--warn" id="cart-hidden-note" style="display: none;"></p>
 
             <div class="cart-summary__row">
               <span class="cart-summary__row-label">Subtotal</span>
@@ -192,6 +197,20 @@
 
       </div>
     </main>
+
+    <!-- Confirmación de "Vaciar mi carrito" (no se usa confirm() nativo: no se
+         puede estilar ni traducir, y en mobile aparece como alerta del navegador) -->
+    <div class="bl-confirm-overlay" id="clear-cart-modal" style="display: none;">
+      <div class="bl-confirm" role="alertdialog" aria-modal="true" aria-labelledby="clear-cart-title" aria-describedby="clear-cart-text">
+        <div class="bl-confirm__icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <h2 class="bl-confirm__title" id="clear-cart-title">Vaciar mi carrito</h2>
+        <p class="bl-confirm__text" id="clear-cart-text">¿Seguro que deseas vaciar tu carrito? Si lo haces deberás de cargar todos los productos nuevamente!</p>
+        <div class="bl-confirm__actions">
+          <button type="button" class="bl-confirm__btn bl-confirm__btn--ghost" id="clear-cart-cancel">Cancelar</button>
+          <button type="button" class="bl-confirm__btn bl-confirm__btn--danger" id="clear-cart-confirm">Confirmar</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Notificación Toast -->
     <div class="toast" id="toast" aria-live="polite" role="status"></div>

@@ -10,6 +10,7 @@
 
 **Cliente**
 - Catálogo con filtros por categoría, búsqueda y ofertas.
+- Carrito agrupado por comercio, con selección por casilla: lo que se destilda queda "pendiente" (sigue guardado, no se cobra), filtro por comercio y envío gratis calculado por tienda.
 - Carrito sincronizado en la nube (funciona también sin sesión) y favoritos.
 - Checkout real con **Mercado Pago** (Checkout Pro), transferencia bancaria con comprobante, o pago simulado.
 - Retiro en el local o envío a domicilio dentro de Baradero (costo calculado según subtotal).
@@ -51,7 +52,8 @@ Proyecto-Pdisc/
 ├── docs/                      # Documentación (ver índice más abajo)
 ├── js/                        # Lógica de frontend, un archivo por página + módulos compartidos
 │   ├── auth-utils.js          # Cliente Supabase, notificaciones globales, PWA, banner offline
-│   ├── cart-utils.js          # Carrito, favoritos, formato de precio, estado de error
+│   ├── cart-utils.js          # Carrito (incluye la selección por ítem), favoritos, formato de precio, estado de error
+│   ├── hints-utils.js         # Guía corta de ayuda (mensajes de una línea) + su preferencia por cuenta
 │   ├── payment-providers.js   # Interfaz común simulado/transferencia/mercadopago
 │   └── ...                    # home.js, carrito.js, vender.js, admin.js, etc. (uno por página)
 ├── pages/                     # Páginas HTML (una por ruta)

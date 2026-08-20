@@ -3,9 +3,10 @@
 import { supabase } from './auth-utils.js';
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
-import { getCart, saveCart, clearCart, updateCartBadge, MAX_QTY, formatPrice, renderActiveCoupons } from './cart-utils.js';
+import { getCart, saveCart, clearPurchasedFromCart, updateCartBadge, MAX_QTY, formatPrice, renderActiveCoupons, isItemSelected, getSelectedItems } from './cart-utils.js';
 import { getPaymentProvider } from './payment-providers.js';
 import { initNotificationsBell } from './nav-utils.js';
+import { showHint, loadHintsPreference, CART_HINTS } from './hints-utils.js';
 
 // --- Estado del Carrito ---
 let currentDiscount = 0; // Porcentaje de descuento (0 a 1)
@@ -13,6 +14,28 @@ let appliedCouponCode = null; // Código tal cual lo valida el servidor en creat
 let deliveryMethod = 'pickup'; // 'pickup' | 'delivery' — ver initDeliveryEvents()
 let shippingAddress = '';
 let paymentMethod = 'mercadopago'; // 'mercadopago' | 'transferencia' — ver initPaymentMethodEvents()
+
+/**
+ * Filtro por comercio: 'all' o el nombre de un comercio.
+ *
+ * Es SOLO una lente de visualización — esconde tarjetas, no toca `selected` de
+ * ningún ítem, y el resumen/checkout siguen leyendo el carrito completo. Si se
+ * confundieran ambas cosas, alguien podría filtrar por un comercio, ver un
+ * total chico y terminar pagando lo de los otros comercios que quedaron
+ * ocultos pero tildados (por eso además existe el aviso #cart-hidden-note).
+ */
+let storeFilter = 'all';
+
+/**
+ * Clave de agrupación: el NOMBRE del comercio, no su `store_id`.
+ * El id real recién llega con validateCartFreshness (async), así que usarlo
+ * como clave haría que los grupos —y el filtro activo— cambiaran de identidad
+ * a mitad de la carga. El nombre ya viene guardado en cada ítem del carrito y
+ * es justo lo que ve el usuario en los chips.
+ */
+function storeKeyOf(item) {
+  return item.shop || 'Tienda';
+}
 
 // F12-04: fallback antes de que termine de cargar el envío real de cada
 // tienda (validateCartFreshness lo trae) — coincide con el default real en
@@ -31,7 +54,12 @@ const storeShippingById = new Map();
 // split payments). Poblado por validateCartFreshness junto al resto.
 const storeMpEligibleById = new Map();
 
-/** Agrupa el carrito por tienda y calcula el envío real de cada una (post-descuento). */
+/**
+ * Agrupa el carrito por tienda y calcula el envío real de cada una (post-descuento).
+ * Recibe SOLO los ítems tildados: un producto en pendiente no viaja a
+ * create_order, así que tampoco puede empujar a esa tienda por encima de su
+ * umbral de envío gratis.
+ */
 function calculateShippingByStore(cart, discount) {
   if (deliveryMethod === 'pickup') return 0;
 
@@ -50,6 +78,301 @@ function calculateShippingByStore(cart, discount) {
   }, 0);
 }
 
+/**
+ * Agrupa el carrito por comercio conservando el índice real de cada ítem
+ * dentro del array del carrito (los botones +/-/borrar siguen trabajando con
+ * ese índice, así que no puede perderse al reordenar en grupos).
+ */
+function groupCartByStore(cart) {
+  const groups = new Map();
+  cart.forEach((item, index) => {
+    const key = storeKeyOf(item);
+    if (!groups.has(key)) groups.set(key, { key, entries: [] });
+    groups.get(key).entries.push({ item, index });
+  });
+  return Array.from(groups.values());
+}
+
+/**
+ * Estado del envío de UN comercio, para el chip de la cabecera del grupo.
+ * Se calcula sobre lo tildado nada más: la gracia es avisar que destildar algo
+ * puede hacer perder el envío gratis ANTES de que el usuario lo descubra
+ * mirando el total.
+ */
+function groupShippingState(entries) {
+  const selected = entries.filter((e) => isItemSelected(e.item));
+  if (selected.length === 0) return { kind: 'pending', text: 'Todo pendiente' };
+
+  // En "retiro en el local" no se cobra envío por nada, así que hablar de
+  // umbrales de envío gratis acá sería un dato falso.
+  if (deliveryMethod === 'pickup') return { kind: 'pickup', text: 'Retirás en el local' };
+
+  const storeId = entries.map((e) => productStoreId.get(e.item.id)).find(Boolean);
+  const config = storeId ? storeShippingById.get(storeId) : null;
+  const threshold = config?.freeShippingThreshold ?? FREE_SHIPPING_THRESHOLD;
+  const fee = config?.deliveryFee ?? FLAT_SHIPPING_FEE;
+
+  const subtotal = selected.reduce((acc, e) => acc + e.item.price * e.item.qty, 0) * (1 - currentDiscount);
+  if (fee === 0 || subtotal >= threshold) return { kind: 'free', text: 'Envío gratis' };
+
+  return {
+    kind: 'missing',
+    text: `Te faltan ${formatPrice(Math.ceil(threshold - subtotal))} para envío gratis`,
+  };
+}
+
+/** Chip de la fila de filtros. `count` = productos de ese comercio en el carrito. */
+function buildFilterChip(key, label, count) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = 'cart-filter__chip';
+  chip.dataset.filter = key;
+  const isActive = storeFilter === key;
+  if (isActive) chip.classList.add('is-active');
+  chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+
+  const name = document.createElement('span');
+  name.className = 'cart-filter__chip-name';
+  name.textContent = label;
+  chip.appendChild(name);
+
+  const sep = document.createElement('span');
+  sep.className = 'cart-filter__chip-sep';
+  sep.textContent = '·';
+  chip.appendChild(sep);
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'cart-filter__chip-count';
+  countSpan.textContent = String(count);
+  chip.appendChild(countSpan);
+
+  return chip;
+}
+
+function renderStoreFilter(groups, totalItems) {
+  const row = document.getElementById('cart-filter');
+  if (!row) return;
+
+  row.innerHTML = '';
+  // Con un solo comercio el filtro no filtra nada: se oculta para no sumar ruido.
+  if (groups.length < 2) {
+    row.style.display = 'none';
+    return;
+  }
+
+  row.style.display = '';
+  row.appendChild(buildFilterChip('all', 'Todos', totalItems));
+  groups.forEach((group) => row.appendChild(buildFilterChip(group.key, group.key, group.entries.length)));
+}
+
+/** Cabecera del grupo: casilla maestra + comercio + chip de envío. */
+function buildGroupHeader(group) {
+  const header = document.createElement('div');
+  header.className = 'cart-group__header';
+
+  const selectedCount = group.entries.filter((e) => isItemSelected(e.item)).length;
+
+  const master = document.createElement('input');
+  master.type = 'checkbox';
+  master.className = 'cart-group__master';
+  master.dataset.store = group.key;
+  master.checked = selectedCount === group.entries.length;
+  // Estado intermedio: hay algunos tildados y otros no. Es una propiedad del
+  // elemento, no un atributo — no se puede setear desde el HTML.
+  master.indeterminate = selectedCount > 0 && selectedCount < group.entries.length;
+  master.setAttribute('aria-label', `Marcar o desmarcar todos los productos de ${group.key}`);
+  header.appendChild(master);
+
+  const icon = document.createElement('i');
+  icon.className = 'fa-solid fa-store cart-group__icon';
+  header.appendChild(icon);
+
+  const name = document.createElement('span');
+  name.className = 'cart-group__name';
+  name.textContent = group.key;
+  header.appendChild(name);
+
+  const shipping = groupShippingState(group.entries);
+  const chip = document.createElement('span');
+  chip.className = `cart-group__shipping cart-group__shipping--${shipping.kind}`;
+  const chipIcon = document.createElement('i');
+  chipIcon.className = shipping.kind === 'pending' ? 'fa-solid fa-clock' : 'fa-solid fa-truck';
+  chip.appendChild(chipIcon);
+  chip.append(` ${shipping.text}`);
+  header.appendChild(chip);
+
+  return header;
+}
+
+/** Fila de un producto dentro de su grupo. */
+function buildCartRow(item, index) {
+  const selected = isItemSelected(item);
+
+  const row = document.createElement('div');
+  row.className = 'cart-item';
+  if (!selected) row.classList.add('cart-item--pending');
+  row.dataset.index = index;
+
+  // --- Casilla de selección ---
+  const selectCell = document.createElement('div');
+  selectCell.className = 'cart-item__select';
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.className = 'cart-item__check';
+  check.dataset.index = index;
+  check.checked = selected;
+  check.setAttribute('aria-label', `Incluir ${item.name} en la compra`);
+  selectCell.appendChild(check);
+  row.appendChild(selectCell);
+
+  // --- Producto (imagen + info) ---
+  const productDiv = document.createElement('div');
+  productDiv.className = 'cart-item__product';
+
+  const img = document.createElement('img');
+  img.src = item.image || '/img/no-image.svg';
+  img.alt = item.name || 'Producto';
+  img.className = 'cart-item__img';
+  img.loading = 'lazy';
+  productDiv.appendChild(img);
+
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'cart-item__info';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'cart-item__name';
+  nameSpan.textContent = item.name;
+  infoDiv.appendChild(nameSpan);
+
+  // El comercio ya está en la cabecera del grupo; acá se reemplaza por el
+  // estado del ítem, que es lo que ahora puede sorprender al usuario.
+  if (!selected) {
+    const pendingSpan = document.createElement('span');
+    pendingSpan.className = 'cart-item__pending-tag';
+    pendingSpan.textContent = 'Pendiente — no entra en esta compra';
+    infoDiv.appendChild(pendingSpan);
+  }
+
+  const detailLink = document.createElement('a');
+  detailLink.href = './home.html';
+  detailLink.className = 'cart-item__detail-link';
+  detailLink.textContent = 'Ver detalle';
+  infoDiv.appendChild(detailLink);
+
+  productDiv.appendChild(infoDiv);
+  row.appendChild(productDiv);
+
+  // --- Precio ---
+  const priceSpan = document.createElement('span');
+  priceSpan.className = 'cart-item__price';
+  priceSpan.textContent = formatPrice(item.price);
+  row.appendChild(priceSpan);
+
+  // --- Cantidad ---
+  const qtyDiv = document.createElement('div');
+  qtyDiv.className = 'cart-qty';
+
+  const minusBtn = document.createElement('button');
+  minusBtn.className = 'cart-qty__btn cart-qty__minus';
+  minusBtn.dataset.index = index;
+  minusBtn.setAttribute('aria-label', 'Disminuir cantidad');
+  if (item.qty <= 1) minusBtn.disabled = true;
+  const minusIcon = document.createElement('i');
+  minusIcon.className = 'fa-solid fa-minus';
+  minusBtn.appendChild(minusIcon);
+  qtyDiv.appendChild(minusBtn);
+
+  const qtyValue = document.createElement('span');
+  qtyValue.className = 'cart-qty__value';
+  qtyValue.textContent = item.qty;
+  qtyDiv.appendChild(qtyValue);
+
+  const plusBtn = document.createElement('button');
+  plusBtn.className = 'cart-qty__btn cart-qty__plus';
+  plusBtn.dataset.index = index;
+  plusBtn.setAttribute('aria-label', 'Aumentar cantidad');
+  const plusIcon = document.createElement('i');
+  plusIcon.className = 'fa-solid fa-plus';
+  plusBtn.appendChild(plusIcon);
+  qtyDiv.appendChild(plusBtn);
+
+  row.appendChild(qtyDiv);
+
+  // --- Subtotal ---
+  const subtotalSpan = document.createElement('span');
+  subtotalSpan.className = 'cart-item__subtotal';
+  subtotalSpan.textContent = formatPrice(item.price * item.qty);
+  row.appendChild(subtotalSpan);
+
+  // --- Acciones (eliminar) ---
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'cart-item__actions';
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'cart-item__delete';
+  deleteBtn.dataset.index = index;
+  deleteBtn.setAttribute('aria-label', `Eliminar ${item.name} del carrito`);
+  const trashIcon = document.createElement('i');
+  trashIcon.className = 'fa-solid fa-trash-can';
+  deleteBtn.appendChild(trashIcon);
+  actionsDiv.appendChild(deleteBtn);
+  row.appendChild(actionsDiv);
+
+  return row;
+}
+
+/** Tarjeta completa de un comercio. */
+function buildGroupCard(group) {
+  const section = document.createElement('section');
+  section.className = 'cart-group';
+  section.dataset.store = group.key;
+
+  // El filtro esconde la tarjeta entera pero la deja renderizada: los índices
+  // de los botones y los totales siguen calculándose sobre el carrito completo.
+  if (storeFilter !== 'all' && group.key !== storeFilter) {
+    section.classList.add('is-filtered-out');
+  }
+
+  section.appendChild(buildGroupHeader(group));
+
+  const cols = document.createElement('div');
+  cols.className = 'cart-group__cols';
+  ['', 'Producto', 'Precio', 'Items', 'Subtotal', ''].forEach((label) => {
+    const span = document.createElement('span');
+    span.textContent = label;
+    cols.appendChild(span);
+  });
+  section.appendChild(cols);
+
+  const list = document.createElement('div');
+  list.className = 'cart-group__items';
+  group.entries.forEach(({ item, index }) => list.appendChild(buildCartRow(item, index)));
+  section.appendChild(list);
+
+  return section;
+}
+
+/**
+ * Botón de checkout: muestra el total real de lo tildado, y sin nada tildado
+ * se deshabilita con un texto que dice qué falta hacer (no un botón muerto).
+ */
+function renderCheckoutButton(selectedCount, total) {
+  const btn = document.getElementById('cart-checkout-btn');
+  if (!btn) return;
+
+  btn.innerHTML = '';
+  if (selectedCount === 0) {
+    btn.disabled = true;
+    btn.textContent = 'Elegí al menos un producto';
+    return;
+  }
+
+  btn.disabled = false;
+  btn.append(`Iniciar pago · ${formatPrice(total)}`);
+  const arrow = document.createElement('i');
+  arrow.className = 'fa-solid fa-arrow-right';
+  btn.appendChild(arrow);
+}
+
 /** Renderizar todo el carrito */
 function renderCart() {
   const cart = getCart();
@@ -60,7 +383,10 @@ function renderCart() {
   const summaryShipping = document.getElementById('summary-shipping');
   const summaryTotal = document.getElementById('summary-total');
   const cartCount = document.getElementById('cart-count');
-  
+  const storesCount = document.getElementById('cart-stores-count');
+  const pendingNote = document.getElementById('cart-pending-note');
+  const hiddenNote = document.getElementById('cart-hidden-note');
+
   // Elementos de descuento
   const summaryDiscountRow = document.getElementById('summary-discount-row');
   const summaryDiscount = document.getElementById('summary-discount');
@@ -70,6 +396,7 @@ function renderCart() {
 
   // Mostrar/ocultar estado vacío
   if (cart.length === 0) {
+    storeFilter = 'all';
     emptyState.style.display = '';
     filledState.style.display = 'none';
     if (summarySubtotal) summarySubtotal.textContent = '$0';
@@ -77,128 +404,42 @@ function renderCart() {
     if (summaryTotal) summaryTotal.textContent = '$0';
     if (summaryDiscountRow) summaryDiscountRow.style.display = 'none';
     if (cartCount) cartCount.textContent = '0 productos';
+    if (storesCount) storesCount.textContent = '';
+    if (pendingNote) pendingNote.style.display = 'none';
+    if (hiddenNote) hiddenNote.style.display = 'none';
+    renderCheckoutButton(0, 0);
     return;
   }
 
   emptyState.style.display = 'none';
   filledState.style.display = '';
 
-  // Construir filas
+  const groups = groupCartByStore(cart);
+
+  // Si el comercio filtrado ya no está en el carrito (se borró su último
+  // producto), el filtro se cae solo — si no, quedaría una lista vacía sin
+  // explicación.
+  if (storeFilter !== 'all' && !groups.some((g) => g.key === storeFilter)) storeFilter = 'all';
+
+  renderStoreFilter(groups, cart.length);
+
   tableBody.innerHTML = '';
+  groups.forEach((group) => tableBody.appendChild(buildGroupCard(group)));
 
-  let subtotal = 0;
-  let totalItems = 0;
+  // --- Totales: SOLO lo tildado, y siempre sobre el carrito completo
+  // (el filtro no participa de ninguno de estos números) ---
+  const selectedItems = getSelectedItems(cart);
+  const pendingItems = cart.filter((item) => !isItemSelected(item));
 
-  cart.forEach((item, index) => {
-    const itemSubtotal = item.price * item.qty;
-    subtotal += itemSubtotal;
-    totalItems += item.qty;
+  const subtotal = selectedItems.reduce((acc, item) => acc + item.price * item.qty, 0);
+  const pendingAmount = pendingItems.reduce((acc, item) => acc + item.price * item.qty, 0);
 
-    const row = document.createElement('div');
-    row.className = 'cart-item';
-    row.dataset.index = index;
-
-    // --- Producto (imagen + info) ---
-    const productDiv = document.createElement('div');
-    productDiv.className = 'cart-item__product';
-
-    const img = document.createElement('img');
-    img.src = item.image || '/img/no-image.svg';
-    img.alt = item.name || 'Producto';
-    img.className = 'cart-item__img';
-    img.loading = 'lazy';
-    productDiv.appendChild(img);
-
-    const infoDiv = document.createElement('div');
-    infoDiv.className = 'cart-item__info';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'cart-item__name';
-    nameSpan.textContent = item.name;
-    infoDiv.appendChild(nameSpan);
-
-    const shopSpan = document.createElement('span');
-    shopSpan.className = 'cart-item__shop';
-    const shopIcon = document.createElement('i');
-    shopIcon.className = 'fa-solid fa-store';
-    shopSpan.appendChild(shopIcon);
-    shopSpan.append(` ${item.shop}`);
-    infoDiv.appendChild(shopSpan);
-
-    const detailLink = document.createElement('a');
-    detailLink.href = './home.html';
-    detailLink.className = 'cart-item__detail-link';
-    detailLink.textContent = 'Ver detalle';
-    infoDiv.appendChild(detailLink);
-
-    productDiv.appendChild(infoDiv);
-    row.appendChild(productDiv);
-
-    // --- Precio ---
-    const priceSpan = document.createElement('span');
-    priceSpan.className = 'cart-item__price';
-    priceSpan.textContent = formatPrice(item.price);
-    row.appendChild(priceSpan);
-
-    // --- Cantidad ---
-    const qtyDiv = document.createElement('div');
-    qtyDiv.className = 'cart-qty';
-
-    const minusBtn = document.createElement('button');
-    minusBtn.className = 'cart-qty__btn cart-qty__minus';
-    minusBtn.dataset.index = index;
-    minusBtn.setAttribute('aria-label', 'Disminuir cantidad');
-    if (item.qty <= 1) minusBtn.disabled = true;
-    const minusIcon = document.createElement('i');
-    minusIcon.className = 'fa-solid fa-minus';
-    minusBtn.appendChild(minusIcon);
-    qtyDiv.appendChild(minusBtn);
-
-    const qtyValue = document.createElement('span');
-    qtyValue.className = 'cart-qty__value';
-    qtyValue.textContent = item.qty;
-    qtyDiv.appendChild(qtyValue);
-
-    const plusBtn = document.createElement('button');
-    plusBtn.className = 'cart-qty__btn cart-qty__plus';
-    plusBtn.dataset.index = index;
-    plusBtn.setAttribute('aria-label', 'Aumentar cantidad');
-    const plusIcon = document.createElement('i');
-    plusIcon.className = 'fa-solid fa-plus';
-    plusBtn.appendChild(plusIcon);
-    qtyDiv.appendChild(plusBtn);
-
-    row.appendChild(qtyDiv);
-
-    // --- Subtotal ---
-    const subtotalSpan = document.createElement('span');
-    subtotalSpan.className = 'cart-item__subtotal';
-    subtotalSpan.textContent = formatPrice(itemSubtotal);
-    row.appendChild(subtotalSpan);
-
-    // --- Acciones (eliminar) ---
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'cart-item__actions';
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'cart-item__delete';
-    deleteBtn.dataset.index = index;
-    deleteBtn.setAttribute('aria-label', 'Eliminar producto');
-    const trashIcon = document.createElement('i');
-    trashIcon.className = 'fa-solid fa-trash-can';
-    deleteBtn.appendChild(trashIcon);
-    actionsDiv.appendChild(deleteBtn);
-    row.appendChild(actionsDiv);
-
-    tableBody.appendChild(row);
-  });
-
-  // Calcular descuento
   const discountAmount = subtotal * currentDiscount;
   const subtotalWithDiscount = subtotal - discountAmount;
 
   // Envío: gratis en "retiro"; en "envío a domicilio" se calcula por tienda
   // (mismo criterio que create_order, ver calculateShippingByStore arriba).
-  const shipping = calculateShippingByStore(cart, currentDiscount);
+  const shipping = calculateShippingByStore(selectedItems, currentDiscount);
   const total = subtotalWithDiscount + shipping;
 
   // Actualizar resumen
@@ -214,7 +455,44 @@ function renderCart() {
 
   if (summaryShipping) summaryShipping.textContent = shipping === 0 ? 'Gratis' : formatPrice(shipping);
   if (summaryTotal) summaryTotal.textContent = formatPrice(total);
-  if (cartCount) cartCount.textContent = `${totalItems} producto${totalItems !== 1 ? 's' : ''}`;
+
+  if (cartCount) {
+    const plural = cart.length !== 1 ? 's' : '';
+    cartCount.textContent = `${selectedItems.length} de ${cart.length} producto${plural} seleccionado${plural}`;
+  }
+
+  if (storesCount) {
+    const storesWithSelection = groups.filter((g) => g.entries.some((e) => isItemSelected(e.item))).length;
+    storesCount.textContent = `${storesWithSelection} de ${groups.length} comercio${groups.length !== 1 ? 's' : ''}`;
+  }
+
+  if (pendingNote) {
+    if (pendingItems.length === 0) {
+      pendingNote.style.display = 'none';
+    } else {
+      pendingNote.style.display = '';
+      pendingNote.textContent = pendingItems.length === 1
+        ? `1 producto queda pendiente por ${formatPrice(pendingAmount)}. Sigue en tu carrito para después.`
+        : `${pendingItems.length} productos quedan pendientes por ${formatPrice(pendingAmount)}. Siguen en tu carrito para después.`;
+    }
+  }
+
+  // La trampa del filtro: hay cosas tildadas que se van a cobrar y que este
+  // filtro no deja ver. Sin este aviso es facilísimo pagar de más creyendo que
+  // el carrito es lo que está en pantalla.
+  if (hiddenNote) {
+    const hiddenSelected = selectedItems.filter((item) => storeFilter !== 'all' && storeKeyOf(item) !== storeFilter);
+    if (hiddenSelected.length === 0) {
+      hiddenNote.style.display = 'none';
+    } else {
+      hiddenNote.style.display = '';
+      hiddenNote.textContent = hiddenSelected.length === 1
+        ? `Ojo: hay 1 producto seleccionado de otro comercio que el filtro «${storeFilter}» te está ocultando. Igual se cobra.`
+        : `Ojo: hay ${hiddenSelected.length} productos seleccionados de otros comercios que el filtro «${storeFilter}» te está ocultando. Igual se cobran.`;
+    }
+  }
+
+  renderCheckoutButton(selectedItems.length, total);
 }
 
 // --- Manejadores de Eventos ---
@@ -447,8 +725,10 @@ function initCouponEvents() {
       // F12-03: un cupón de vendedor (store_id no nulo) solo sirve si el
       // carrito tiene algo de esa tienda -- create_order lo revalida igual,
       // pero avisar acá evita el "¡aplicado!" engañoso que en el total real
-      // termina descontando 0%.
-      const cartStoreIds = new Set(getCart().map((item) => productStoreId.get(item.id)).filter(Boolean));
+      // termina descontando 0%. Se miran solo los ítems TILDADOS: si los de esa
+      // tienda quedaron todos en pendiente, no viajan a create_order y el
+      // descuento sería 0 igual.
+      const cartStoreIds = new Set(getSelectedItems(getCart()).map((item) => productStoreId.get(item.id)).filter(Boolean));
       const noAplica = data?.store_id && !cartStoreIds.has(data.store_id);
 
       if (error || !data) {
@@ -561,14 +841,58 @@ function initCartEvents() {
     }
   });
 
-  // Botón vaciar carrito
-  const clearBtn = document.getElementById('cart-clear-btn');
-  clearBtn?.addEventListener('click', () => {
-    saveCart([]);
-    updateCartBadge();
-    renderCart();
-    showCartToast('Carrito vaciado');
+  /**
+   * Selección por casilla. Va por `change` (no `click`) para que también
+   * funcione con teclado (barra espaciadora) sin duplicar el manejador.
+   *
+   * Ojo con lo que NO se hace acá: no se llama a updateCartBadge(). El badge
+   * del navbar cuenta TODO lo que hay en el carrito, tildado o no — un
+   * pendiente sigue siendo algo que el usuario tiene guardado.
+   */
+  tableBody.addEventListener('change', (e) => {
+    const el = e.target;
+    const cart = getCart();
+
+    if (el.classList.contains('cart-item__check')) {
+      const index = parseInt(el.dataset.index, 10);
+      if (!cart[index]) return;
+      const checked = el.checked;
+      cart[index].selected = checked;
+      saveCart(cart);
+      renderCart();
+      showHint(checked ? CART_HINTS.itemSelected : CART_HINTS.itemDeselected, checked ? 'success' : 'default');
+      return;
+    }
+
+    if (el.classList.contains('cart-group__master')) {
+      const store = el.dataset.store;
+      const checked = el.checked;
+      cart.forEach((item) => {
+        if (storeKeyOf(item) === store) item.selected = checked;
+      });
+      saveCart(cart);
+      renderCart();
+      showHint(
+        checked ? CART_HINTS.storeSelected(store) : CART_HINTS.storeDeselected(store),
+        checked ? 'success' : 'default'
+      );
+    }
   });
+
+  // Filtro por comercio. Lo único que hace es cambiar `storeFilter` y volver a
+  // pintar: NUNCA escribe `selected` de ningún ítem ni guarda el carrito.
+  const filterRow = document.getElementById('cart-filter');
+  filterRow?.addEventListener('click', (e) => {
+    const chip = e.target.closest('.cart-filter__chip');
+    if (!chip) return;
+    storeFilter = chip.dataset.filter;
+    renderCart();
+    showHint(storeFilter === 'all' ? CART_HINTS.filterAll : CART_HINTS.filterStore(storeFilter));
+  });
+
+  // Botón vaciar carrito: confirmación propia (ver initClearCartModal)
+  const clearBtn = document.getElementById('cart-clear-btn');
+  clearBtn?.addEventListener('click', () => openClearCartModal());
 
   // Botón iniciar pago: crea la(s) orden(es) de verdad vía el RPC create_order.
   // El método de entrega queda fijo en "pickup" sin dirección por ahora —
@@ -577,6 +901,16 @@ function initCartEvents() {
   checkoutBtn?.addEventListener('click', async () => {
     const currentCart = getCart();
     if (currentCart.length === 0) return;
+
+    // 0. Solo se compra lo TILDADO. Todo lo que sigue (validaciones, payload,
+    // vaciado posterior) trabaja con `selectedItems`, nunca con `currentCart`:
+    // mandar un pendiente a create_order sería cobrarle al cliente algo que
+    // decidió explícitamente no comprar.
+    const selectedItems = getSelectedItems(currentCart);
+    if (selectedItems.length === 0) {
+      showCartToast('Elegí al menos un producto para continuar.', 'error');
+      return;
+    }
 
     // 1. Requerir autenticación
     const { data: { session } } = await supabase.auth.getSession();
@@ -599,7 +933,7 @@ function initCartEvents() {
     try {
       // create_order vuelve a leer el precio real de cada producto en el
       // servidor — no hace falta (ni conviene) mandarle el precio del carrito.
-      const payload = currentCart.map(item => ({ id: item.id, qty: item.qty }));
+      const payload = selectedItems.map(item => ({ id: item.id, qty: item.qty }));
 
       const { data, error } = await supabase.rpc('create_order', {
         cart_payload: payload,
@@ -643,7 +977,7 @@ function initCartEvents() {
         // cliente la puede reintentar después (ver historial, F2-06).
         console.error('Error al confirmar el pago:', paymentResult.message);
         showCartToast('Pedido creado, pero hubo un problema al confirmar el pago.', 'error');
-        clearCart();
+        clearPurchasedFromCart();
         setTimeout(() => window.location.href = './home.html', 2000);
         return;
       }
@@ -656,15 +990,99 @@ function initCartEvents() {
           ? `¡${orders.length} pedidos pagados! Total: ${formatPrice(total)}`
           : `¡Pedido pagado! Total: ${formatPrice(total)}`;
 
-      clearCart();
+      // Se vacía solo lo comprado: los pendientes son una decisión explícita
+      // del usuario ("esto lo dejo para después"), borrarlos junto con la
+      // compra sería pisarla.
+      clearPurchasedFromCart();
+      updateCartBadge();
       showCartToast(mensaje, 'success');
       setTimeout(() => window.location.href = paymentResult.pending ? './perfil.html' : './home.html', 2500);
     } catch (err) {
       console.error(err);
       showCartToast('Error de conexión al procesar el pedido.', 'error');
     } finally {
-      checkoutBtn.disabled = false;
-      checkoutBtn.innerHTML = 'Iniciar pago <i class="fa-solid fa-arrow-right"></i>';
+      // renderCart() reconstruye el botón con el texto/estado que corresponda
+      // (total real, o deshabilitado si no quedó nada tildado) — antes acá se
+      // repetía un texto fijo que ahora sería mentira.
+      renderCart();
+    }
+  });
+}
+
+/**
+ * Modal de confirmación de "Vaciar mi carrito".
+ * Vaciar borra TODO (tildado y pendiente), que es justo lo que lo hace
+ * peligroso ahora que un pendiente puede llevar días guardado — de ahí el
+ * paso extra. El texto es literal, pedido por el usuario.
+ *
+ * Accesibilidad: foco atrapado dentro del modal mientras está abierto, Escape
+ * cierra, y al cerrar el foco vuelve al botón que lo abrió.
+ */
+let clearModalLastFocus = null;
+
+function openClearCartModal() {
+  const modal = document.getElementById('clear-cart-modal');
+  if (!modal) return;
+  // Fallback al botón que abre el modal: si se llegó acá con el foco en el
+  // <body> (pasa al activar por teclado desde otro lado), devolverlo al body
+  // dejaría el foco en un elemento ya oculto.
+  const active = document.activeElement;
+  clearModalLastFocus = active instanceof HTMLElement && active !== document.body
+    ? active
+    : document.getElementById('cart-clear-btn');
+  modal.style.display = '';
+  // Arranca en "Cancelar": la opción segura es la que recibe el foco.
+  document.getElementById('clear-cart-cancel')?.focus();
+}
+
+function closeClearCartModal() {
+  const modal = document.getElementById('clear-cart-modal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  if (clearModalLastFocus instanceof HTMLElement) clearModalLastFocus.focus();
+}
+
+function initClearCartModal() {
+  const modal = document.getElementById('clear-cart-modal');
+  if (!modal) return;
+
+  const cancelBtn = document.getElementById('clear-cart-cancel');
+  const confirmBtn = document.getElementById('clear-cart-confirm');
+
+  cancelBtn?.addEventListener('click', closeClearCartModal);
+
+  confirmBtn?.addEventListener('click', () => {
+    saveCart([]);
+    updateCartBadge();
+    closeClearCartModal();
+    renderCart();
+    showCartToast('Carrito vaciado');
+  });
+
+  // Clic en el fondo = cancelar (nunca confirmar: es la acción destructiva).
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeClearCartModal();
+  });
+
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeClearCartModal();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+
+    // Trampa de foco: solo hay 2 botones, así que el ciclo es entre ellos.
+    const focusables = [cancelBtn, confirmBtn].filter(Boolean);
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
     }
   });
 }
@@ -792,6 +1210,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCartBadge();
   initNotificationsBell();
   initCartEvents();
+  initClearCartModal();
+  // La preferencia real vive en la cuenta; hasta que resuelva manda la cache
+  // local (ver hints-utils.js). No se espera a propósito: el carrito tiene que
+  // pintar ya.
+  loadHintsPreference();
   initCouponEvents();
   initDeliveryEvents();
   initPaymentMethodEvents();

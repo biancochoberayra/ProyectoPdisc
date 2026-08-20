@@ -37,31 +37,179 @@
   overflow: hidden;
 }
 
-/* Encabezado de la tabla */
-.cart-table__header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 60px;
+/* -----------------------------------------------------------
+   FILTRO POR COMERCIO (chips)
+   Solo esconde tarjetas: nunca cambia lo que está tildado.
+   ----------------------------------------------------------- */
+
+.cart-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.875rem 1.25rem;
   border-bottom: 1px solid var(--bl-border);
   background: var(--bl-surface-alt);
+  /* En mobile la fila scrollea en horizontal en vez de romper el layout */
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
-.cart-table__header span {
+.cart-filter__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  max-width: 14rem;
+  padding: 0.4rem 0.875rem;
+  border: 1px solid var(--bl-border);
+  border-radius: var(--bl-radius-pill);
+  background: var(--bl-surface);
+  color: var(--bl-text-secondary);
+  font-family: var(--bl-font);
   font-size: 0.8125rem;
   font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.cart-filter__chip:hover {
+  border-color: var(--bl-primary);
+  color: var(--bl-primary);
+}
+
+.cart-filter__chip.is-active {
+  background: var(--bl-primary);
+  border-color: var(--bl-primary);
+  color: var(--bl-text-inverse);
+}
+
+.cart-filter__chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-filter__chip-sep,
+.cart-filter__chip-count {
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+/* -----------------------------------------------------------
+   GRUPO POR COMERCIO
+   ----------------------------------------------------------- */
+
+.cart-group {
+  border-bottom: 1px solid var(--bl-border);
+}
+
+.cart-group:last-child {
+  border-bottom: none;
+}
+
+/* El filtro esconde la tarjeta entera; el ítem sigue en el carrito y
+   sigue contando para el resumen y el checkout. */
+.cart-group.is-filtered-out {
+  display: none;
+}
+
+.cart-group__header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--bl-surface-alt);
+  border-bottom: 1px solid var(--bl-border-light);
+}
+
+.cart-group__icon {
+  color: var(--bl-primary);
+  font-size: 0.875rem;
+}
+
+.cart-group__name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--bl-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chip de envío del comercio: avisa que destildar algo puede costar el
+   envío gratis antes de que se vea en el total. */
+.cart-group__shipping {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--bl-radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--bl-border-light);
   color: var(--bl-text-secondary);
+}
+
+.cart-group__shipping--free {
+  background: var(--bl-surface);
+  color: var(--bl-success);
+  border: 1px solid var(--bl-success);
+}
+
+.cart-group__shipping--missing {
+  background: var(--bl-surface);
+  color: var(--bl-accent-hover);
+  border: 1px solid var(--bl-accent);
+}
+
+.cart-group__shipping--pending {
+  background: var(--bl-surface);
+  color: var(--bl-text-muted);
+  border: 1px solid var(--bl-border);
+}
+
+/* Títulos de columna, uno por grupo (se ocultan en mobile) */
+.cart-group__cols {
+  display: grid;
+  grid-template-columns: 2.25rem 2fr 1fr 1fr 1fr 60px;
+  padding: 0.5rem 1.25rem;
+  border-bottom: 1px solid var(--bl-border-light);
+}
+
+.cart-group__cols span {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--bl-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* Casillas de selección */
+.cart-group__master,
+.cart-item__check {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  accent-color: var(--bl-primary);
+  cursor: pointer;
+}
+
+.cart-item__select {
+  display: flex;
+  align-items: center;
 }
 
 /* Fila de producto */
 .cart-item {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 60px;
+  grid-template-columns: 2.25rem 2fr 1fr 1fr 1fr 60px;
   align-items: center;
   padding: 1.25rem;
   border-bottom: 1px solid var(--bl-border-light);
-  transition: background 0.15s;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 .cart-item:last-child {
@@ -70,6 +218,33 @@
 
 .cart-item:hover {
   background: var(--bl-surface-hover);
+}
+
+/* Producto destildado: sigue en el carrito, pero no se compra ahora.
+   Se atenúa y se tacha el precio para que no se confunda con el total. */
+.cart-item--pending {
+  opacity: 0.55;
+}
+
+.cart-item--pending .cart-item__price,
+.cart-item--pending .cart-item__subtotal {
+  text-decoration: line-through;
+}
+
+/* La atenuación del `opacity` no se puede "deshacer" en un hijo (el grupo ya
+   está compuesto), así que al pasar el mouse o enfocar la casilla la fila
+   vuelve a plena: destildar no debe dejar el ítem visualmente inaccesible. */
+.cart-item--pending:hover,
+.cart-item--pending:focus-within {
+  opacity: 1;
+}
+
+.cart-item__pending-tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--bl-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 /* Info del producto (imagen + texto) */
@@ -103,10 +278,8 @@
   line-height: 1.35;
 }
 
-.cart-item__shop {
-  font-size: 0.75rem;
-  color: var(--bl-text-muted);
-}
+/* El nombre del comercio dejó de repetirse fila por fila: ahora vive una sola
+   vez en la cabecera del grupo (.cart-group__name). */
 
 .cart-item__detail-link {
   font-size: 0.75rem;
@@ -497,6 +670,23 @@
   color: var(--bl-success);
 }
 
+/* Avisos del resumen (pendientes / seleccionado y oculto por el filtro).
+   Hablan siempre del carrito completo, no de lo que se ve en pantalla. */
+.cart-summary__note {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--bl-text-secondary);
+  background: var(--bl-surface);
+  border-left: 3px solid var(--bl-border);
+  padding: 0.5rem 0.625rem;
+}
+
+.cart-summary__note--warn {
+  color: var(--bl-accent-hover);
+  border-left-color: var(--bl-accent);
+}
+
 .cart-summary__divider {
   height: 1px;
   background: var(--bl-border);
@@ -545,6 +735,107 @@
 
 .cart-summary__checkout:active {
   transform: scale(0.98);
+}
+
+/* Sin nada tildado el botón no es clickeable, y el texto dice qué falta */
+.cart-summary__checkout:disabled {
+  background: var(--bl-text-muted);
+  cursor: not-allowed;
+  font-size: 0.9375rem;
+}
+
+.cart-summary__checkout:disabled:hover {
+  background: var(--bl-text-muted);
+  transform: none;
+}
+
+/* ===========================================================
+   MODAL DE CONFIRMACIÓN (vaciar carrito)
+   =========================================================== */
+
+.bl-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(26, 32, 44, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.bl-confirm {
+  width: 100%;
+  max-width: 26rem;
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-border);
+  border-radius: var(--bl-radius-lg);
+  box-shadow: var(--bl-shadow-lg);
+  padding: 1.75rem 1.5rem 1.25rem;
+  text-align: center;
+}
+
+.bl-confirm__icon {
+  font-size: 1.75rem;
+  color: var(--bl-danger);
+  margin-bottom: 0.75rem;
+}
+
+.bl-confirm__title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--bl-text);
+  margin-bottom: 0.5rem;
+}
+
+.bl-confirm__text {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--bl-text-secondary);
+  margin-bottom: 1.25rem;
+}
+
+.bl-confirm__actions {
+  display: flex;
+  gap: 0.625rem;
+  justify-content: center;
+}
+
+.bl-confirm__btn {
+  flex: 1;
+  padding: 0.6875rem 1rem;
+  border-radius: var(--bl-radius-pill);
+  font-family: var(--bl-font);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.bl-confirm__btn--ghost {
+  background: var(--bl-surface);
+  border: 1px solid var(--bl-border);
+  color: var(--bl-text-secondary);
+}
+
+.bl-confirm__btn--ghost:hover {
+  border-color: var(--bl-primary);
+  color: var(--bl-primary);
+}
+
+.bl-confirm__btn--danger {
+  background: var(--bl-danger);
+  border: 1px solid var(--bl-danger);
+  color: var(--bl-text-inverse);
+}
+
+.bl-confirm__btn--danger:hover {
+  opacity: 0.9;
+}
+
+.bl-confirm__btn:focus-visible {
+  outline: 2px solid var(--bl-primary);
+  outline-offset: 2px;
 }
 
 /* Badge del carrito en el navbar */
@@ -600,18 +891,54 @@
   }
 
   /* Convertir la tabla a layout de tarjeta en móvil */
-  .cart-table__header {
+  .cart-group__cols {
     display: none;
   }
 
+  .cart-filter {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Tarjeta apilada con la casilla arriba a la izquierda: ocupa la primera
+     fila junto al producto, el resto se apila debajo a ancho completo. */
   .cart-item {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.5rem 0.625rem;
     padding: 1rem;
+    align-items: start;
+  }
+
+  .cart-item__select {
+    grid-row: 1;
+    grid-column: 1;
+    padding-top: 0.25rem;
   }
 
   .cart-item__product {
+    grid-row: 1;
+    grid-column: 2;
     gap: 0.75rem;
+  }
+
+  .cart-item__price,
+  .cart-qty,
+  .cart-item__subtotal,
+  .cart-item__actions {
+    grid-column: 2;
+  }
+
+  .cart-item__actions {
+    justify-content: flex-start;
+  }
+
+  .cart-group__header {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+
+  .cart-group__shipping {
+    margin-left: 0;
+    flex-basis: 100%;
   }
 
   .cart-item__img {
