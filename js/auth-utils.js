@@ -154,6 +154,19 @@ export function setLoading(btn, loading, originalText = "Enviar") {
   }
 }
 
+// Botón de ojito para mostrar/ocultar una contraseña.
+export function initPasswordToggle(btnId, input) {
+  const btn = document.getElementById(btnId);
+  if (!btn || !input) return;
+  btn.addEventListener("click", () => {
+    const show = input.getAttribute("type") === "password";
+    input.setAttribute("type", show ? "text" : "password");
+    const icon = btn.querySelector("i");
+    if (icon) icon.className = show ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+    btn.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+  });
+}
+
 // --- Validaciones ---
 export function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

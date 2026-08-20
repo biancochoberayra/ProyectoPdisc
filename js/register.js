@@ -1,8 +1,9 @@
-import { supabase, showToast, setLoading, isValidEmail, checkUrlErrors, guardPage } from "./auth-utils.js";
+import { supabase, showToast, setLoading, isValidEmail, checkUrlErrors, guardPage, initPasswordToggle } from "./auth-utils.js";
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
 const registerEmailInput = document.getElementById("register-email");
 const registerPasswordInput = document.getElementById("register-password");
+const registerPasswordConfirmInput = document.getElementById("register-password-confirm");
 const registerNameInput = document.getElementById("register-name");
 const registerBtn = document.getElementById("register-btn");
 const googleRegisterBtn = document.getElementById("google-register-btn");
@@ -24,6 +25,7 @@ function checkTermsAccepted(checkboxEl, labelId) {
 function disableAllInputs() {
   if (registerEmailInput) registerEmailInput.disabled = true;
   if (registerPasswordInput) registerPasswordInput.disabled = true;
+  if (registerPasswordConfirmInput) registerPasswordConfirmInput.disabled = true;
   if (registerNameInput) registerNameInput.disabled = true;
   if (registerBtn) {
     registerBtn.disabled = true;
@@ -35,6 +37,17 @@ function disableAllInputs() {
     googleRegisterBtn.style.opacity = "0.6";
     googleRegisterBtn.style.cursor = "not-allowed";
   }
+}
+
+// Aviso persistente tras un registro que necesita confirmar el correo. El toast
+// dura 4 segundos y se pierde; esto queda hasta que el usuario abra el mail.
+function showConfirmEmailNotice(email) {
+  const notice = document.createElement("p");
+  notice.className = "auth-confirm-notice";
+  notice.setAttribute("role", "status");
+  notice.textContent = `Te enviamos un correo a ${email}. Abrilo y tocá el link para confirmar tu cuenta: con eso entrás directo, no hace falta que inicies sesión de nuevo.`;
+  registerBtn?.insertAdjacentElement("afterend", notice);
+  notice.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 // --- Mapeo de errores de Supabase a mensajes claros en español ---
@@ -81,8 +94,8 @@ async function registerWithEmail() {
 
   const email = registerEmailInput?.value?.trim() ?? "";
   const password = registerPasswordInput?.value ?? "";
+  const passwordConfirm = registerPasswordConfirmInput?.value ?? "";
   const name = registerNameInput?.value?.trim() ?? "";
-  const accountType = document.querySelector('input[name="account_type"]:checked')?.value ?? "cliente";
 
   // Validaciones locales específicas
   if (!name) {
@@ -116,6 +129,17 @@ async function registerWithEmail() {
     registerPasswordInput?.focus();
     return;
   }
+  if (!passwordConfirm) {
+    showToast("Repetí la contraseña para confirmarla.", "error");
+    registerPasswordConfirmInput?.focus();
+    return;
+  }
+  if (password !== passwordConfirm) {
+    showToast("Las contraseñas no coinciden.", "error");
+    registerPasswordConfirmInput?.focus();
+    registerPasswordConfirmInput?.select();
+    return;
+  }
 
   setLoading(registerBtn, true, "Crear cuenta");
 
@@ -126,7 +150,11 @@ async function registerWithEmail() {
       options: {
         data: {
           full_name: name,
-        }
+        },
+        // Si el proyecto pide confirmar el correo, el link del mail vuelve a la
+        // app y ahí mismo queda la sesión abierta (mismo destino que el OAuth de
+        // Google). Sin esto caía en el Site URL y había que iniciar sesión a mano.
+        emailRedirectTo: `${window.location.origin}/pages/home.html`,
       }
     });
 
@@ -145,11 +173,20 @@ async function registerWithEmail() {
 
     // Éxito
     disableAllInputs();
-    showToast("¡Cuenta creada con éxito! Revisá tu correo para confirmar el registro.", "success");
 
-    setTimeout(() => {
-      window.location.href = "../pages/login.html";
-    }, 3500);
+    if (data?.session) {
+      // El proyecto no exige confirmar el correo: signUp ya devolvió sesión, o
+      // sea que la cuenta quedó abierta. Mandar a login sería pedirle la
+      // contraseña a alguien que ya está adentro.
+      showToast("¡Cuenta creada con éxito! Entrando...", "success");
+      window.location.replace("../pages/home.html");
+      return;
+    }
+
+    // Hace falta confirmar el correo: se queda acá con el aviso a la vista, sin
+    // rebotar a login (el link del mail lo deja logueado en Home).
+    showToast("¡Cuenta creada! Revisá tu correo para confirmar el registro.", "success");
+    showConfirmEmailNotice(email);
   } catch (err) {
     console.error("Unexpected register error:", err);
     showToast("Error inesperado. Intentá de nuevo más tarde.", "error");
@@ -196,22 +233,8 @@ function initRegisterForm() {
   googleRegisterBtn?.addEventListener("click", registerWithGoogle);
 
   // Alternar visibilidad de contraseña
-  const toggleRegisterPasswordBtn = document.getElementById("toggle-register-password");
-  toggleRegisterPasswordBtn?.addEventListener("click", () => {
-    const type = registerPasswordInput.getAttribute("type") === "password" ? "text" : "password";
-    registerPasswordInput.setAttribute("type", type);
-    
-    const icon = toggleRegisterPasswordBtn.querySelector("i");
-    if (icon) {
-      if (type === "text") {
-        icon.className = "fa-regular fa-eye-slash";
-        toggleRegisterPasswordBtn.setAttribute("aria-label", "Ocultar contraseña");
-      } else {
-        icon.className = "fa-regular fa-eye";
-        toggleRegisterPasswordBtn.setAttribute("aria-label", "Mostrar contraseña");
-      }
-    }
-  });
+  initPasswordToggle("toggle-register-password", registerPasswordInput);
+  initPasswordToggle("toggle-register-password-confirm", registerPasswordConfirmInput);
 
   // Verificar errores OAuth en la URL
   checkUrlErrors();

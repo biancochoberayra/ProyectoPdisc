@@ -1,24 +1,11 @@
-import { supabase, showToast, setLoading, isValidEmail, checkUrlErrors, guardPage } from "./auth-utils.js";
+import { supabase, showToast, setLoading, isValidEmail, checkUrlErrors, guardPage, initPasswordToggle } from "./auth-utils.js";
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
 const emailInput = document.getElementById("correo");
 const passwordInput = document.getElementById("password");
 const localLoginBtn = document.getElementById("local-login-btn");
 const googleLoginBtn = document.getElementById("google-login-btn");
-const termsCheckbox = document.getElementById("terms-checkbox");
-// Un solo checkbox para ambas acciones (email y Google)
-
-// --- Valida y resalta el checkbox de términos ---
-function checkTermsAccepted(checkboxEl, labelId) {
-  const label = document.getElementById(labelId);
-  if (!checkboxEl?.checked) {
-    label?.classList.add("auth-terms--error");
-    setTimeout(() => label?.classList.remove("auth-terms--error"), 500);
-    showToast("Debés aceptar los Términos y Condiciones para continuar.", "error");
-    return false;
-  }
-  return true;
-}
+// Los Términos y Condiciones se aceptan al registrarse, no en cada login.
 
 // --- Mapeo de errores de Supabase a mensajes claros en español ---
 function mapLoginError(error) {
@@ -48,9 +35,6 @@ function mapLoginError(error) {
 
 // --- Login con email/contraseña ---
 async function loginLocal() {
-  // Validar aceptación de términos
-  if (!checkTermsAccepted(termsCheckbox, "terms-label")) return;
-
   const email = emailInput?.value?.trim() ?? "";
   const password = passwordInput?.value ?? "";
 
@@ -99,9 +83,6 @@ async function loginLocal() {
 
 // --- Login con Google ---
 async function loginWithGoogle() {
-  // Validar aceptación de términos (mismo checkbox que email)
-  if (!checkTermsAccepted(termsCheckbox, "terms-label")) return;
-
   setLoading(googleLoginBtn, true, "Iniciar sesión con Google");
 
   try {
@@ -136,22 +117,7 @@ function initLoginForm() {
   googleLoginBtn?.addEventListener("click", loginWithGoogle);
 
   // Alternar visibilidad de contraseña
-  const togglePasswordBtn = document.getElementById("toggle-password");
-  togglePasswordBtn?.addEventListener("click", () => {
-    const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
-    passwordInput.setAttribute("type", type);
-    
-    const icon = togglePasswordBtn.querySelector("i");
-    if (icon) {
-      if (type === "text") {
-        icon.className = "fa-regular fa-eye-slash";
-        togglePasswordBtn.setAttribute("aria-label", "Ocultar contraseña");
-      } else {
-        icon.className = "fa-regular fa-eye";
-        togglePasswordBtn.setAttribute("aria-label", "Mostrar contraseña");
-      }
-    }
-  });
+  initPasswordToggle("toggle-password", passwordInput);
 
   // --- Olvidaste tu contraseña ---
   const forgotPasswordLink = document.getElementById("forgot-password-link");
