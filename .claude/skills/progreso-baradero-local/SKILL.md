@@ -5,6 +5,45 @@ description: Historial detallado de todas las fases completadas (F0 a F12) del p
 
 # Historial de fases — Baradero Local
 
+## Arreglo del flujo de registro/login (2026-08-15)
+Rama `fix-flujo-registro-login`. El usuario reportó tres cosas: (1) después de registrarse la app
+igual le pedía iniciar sesión, (2) el registro no pedía repetir la contraseña, (3) los Términos y
+Condiciones se pedían también en el login, cuando deberían aceptarse solo al registrarse.
+- **(1) "me pide iniciar sesión después de registrarme"** — `register.js` hacía siempre lo mismo
+  después de un `signUp()` exitoso: toast "revisá tu correo" + `setTimeout(3500)` →
+  `login.html`, sin mirar `data.session`. Dos problemas distintos ahí:
+  - Si el proyecto **no** exige confirmar el correo, `signUp` devuelve sesión: la cuenta ya quedó
+    abierta y mandarlo a login es pedirle la contraseña a alguien que ya está adentro. Ahora
+    `if (data?.session)` → `location.replace('../pages/home.html')`. (En la práctica el
+    `onAuthStateChange` de `guardPage` ya lo redirigía por el evento `SIGNED_IN` antes de que
+    corriera este branch, así que lo que se veía era el toast equivocado y una carrera de
+    redirecciones; ahora el destino es explícito.)
+  - Si **sí** exige confirmar, se queda en `register.html` con un aviso persistente
+    (`.auth-confirm-notice`, insertado después del botón) en vez de rebotar a login — el toast dura
+    4s y se perdía. Y se agregó `emailRedirectTo: ${origin}/pages/home.html` al `signUp`: sin eso el
+    link del mail caía en el Site URL de Supabase; ahora vuelve a la app y la sesión queda abierta
+    ahí mismo (mismo destino que ya usaba el OAuth de Google, o sea que la URL ya estaba en la
+    allow-list de Redirect URLs).
+- **(2) repetir contraseña** — campo `#register-password-confirm` en `register.html` + validación
+  (vacío / no coincide → toast + focus + select). Va después de la validación de fuerza existente
+  (8 chars, mayúscula, número).
+- **(3) términos solo en el registro** — se sacó el bloque `.auth-terms` de `login.html` y
+  `checkTermsAccepted` de `login.js` (el checkbox seguía siendo la misma id `#terms-checkbox` en
+  ambas páginas). El CSS `.auth-terms*` queda porque lo usa `register.html`.
+- **Dedup de paso**: el botón de ojito estaba copiado en `login.js` y `register.js` y hacía falta una
+  tercera copia para el campo nuevo → se movió a `initPasswordToggle(btnId, input)` en
+  `auth-utils.js` y las tres lo usan.
+- **Limpieza**: `register.js` leía `account_type` de los radios y no lo mandaba a ningún lado
+  (variable muerta desde la migración 23, que fuerza `role='cliente'` para todo usuario nuevo) —
+  eliminada. **Ojo**: los radios "Cliente / Vendedor" siguen en el HTML y no hacen nada; queda
+  anotado como pendiente en CLAUDE.md.
+- **Verificación** (vite dev en :5199, herramientas de browser): campo nuevo renderiza; contraseñas
+  distintas → toast "Las contraseñas no coinciden" + focus en el campo, sin llamar a `signUp`; las
+  dos ramas post-signUp probadas **stubbeando `window.fetch` sobre `/auth/v1/signup`** (para no crear
+  usuarios reales en producción): sin sesión → sigue en `register.html` con el aviso y los inputs
+  deshabilitados; con sesión (JWT falso armado a mano) → termina en `home.html`. Login sin checkbox
+  llega a Supabase y devuelve "Correo o contraseña incorrectos"; ojito ok en ambos sentidos.
+
 ## Rediseño del alta de producto (panel vendedor) (2026-08-14)
 Rama `rediseno-publicar-producto`. El usuario reportó que "la pestaña cuando el vendedor sube un
 producto está muy verde" y pidió rediseñarla entera, con plan previo. Tres decisiones suyas al

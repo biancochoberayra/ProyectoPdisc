@@ -559,3 +559,15 @@ body {
 .auth-terms__link:hover {
   color: var(--auth-primary-hover);
 }
+
+/* ---- Aviso de "confirmá tu correo" después de registrarte ---- */
+.auth-confirm-notice {
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1.5px solid #86efac;
+  border-radius: 0.5rem;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
