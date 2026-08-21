@@ -37,6 +37,14 @@
 
 ---
 
+**Accesibilidad**
+- Pensada para usarse con **TalkBack** (el lector de pantalla de Android): "saltar al contenido"
+  en todas las páginas, un `<h1>` por pantalla, campos de formulario con nombre accesible, y los
+  botones generados por JS anuncian de qué producto hablan.
+- Detalle y pendientes en [docs/ACCESIBILIDAD.md](docs/ACCESIBILIDAD.md).
+
+---
+
 ## 🛠️ Stack técnico
 
 - **Frontend**: Vite 8 (multipágina) + JavaScript vanilla ES6 (sin framework), CSS3 con variables nativas.
@@ -79,6 +87,7 @@ Proyecto-Pdisc/
 | [docs/GUIA_USUARIO.md](docs/GUIA_USUARIO.md) | Guía de uso por rol (cliente/vendedor/repartidor/admin). |
 | [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Cómo está armado el sistema: modelo de datos, seguridad, decisiones clave. |
 | [docs/TESTING_CHECKLIST.md](docs/TESTING_CHECKLIST.md) | Checklist manual de testing por rol y flujo. |
+| [docs/ACCESIBILIDAD.md](docs/ACCESIBILIDAD.md) | Qué se hizo para lectores de pantalla, cómo se verificó y qué falta. |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Plan completo del proyecto (fuente de verdad de qué está hecho y qué falta). |
 | [CLAUDE.md](CLAUDE.md) | Contexto de proyecto para trabajar con Claude Code (historial de decisiones y progreso). |
 
