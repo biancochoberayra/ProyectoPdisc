@@ -60,7 +60,8 @@ Proyecto-Pdisc/
 ├── public/                    # Assets servidos verbatim (íconos, manifest, imágenes optimizadas)
 ├── scripts/                   # Scripts de tooling (Jira, optimización de imágenes)
 ├── supabase/functions/        # Edge Functions (Mercado Pago)
-├── .env                       # Claves públicas de Supabase (sí, se versiona — ver docs/RUN_LOCAL.md)
+├── .env                       # Claves públicas de Supabase — NO se versiona (está en .gitignore):
+│                              # copiar de .env.example y completar. Ver docs/RUN_LOCAL.md
 └── vite.config.js             # Entradas del build multipágina
 ```
 
@@ -86,6 +87,14 @@ Proyecto-Pdisc/
 npm install
 cp .env.example .env   # completar con tus claves de Supabase
 npm run dev
+```
+
+### Ver el build compilado
+
+```bash
+npm run preview      # sirve dist/ con la raíz correcta
+npm run build:local  # compila a dist-local/ con rutas relativas, para abrirlo
+                     # con Live Server o a mano desde cualquier carpeta
 ```
 
 La base de datos necesita las migraciones de `db/schema/` aplicadas **en orden** antes de que la app funcione — el paso a paso completo (incluyendo Google OAuth) está en [docs/RUN_LOCAL.md](docs/RUN_LOCAL.md).
