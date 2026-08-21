@@ -17,6 +17,8 @@
 - Historial de compras, reseñas de productos/comercios, chat directo con el vendedor.
 - Centro de notificaciones (pedido creado, pagado, enviado, entregado).
 - Instalable como **PWA** (funciona offline para contenido ya visitado).
+- **Farmacias de turno**: la de guardia en este momento (con estado en vivo, teléfono, WhatsApp
+  y cómo llegar) y los turnos de los próximos días. Página pública, no hace falta iniciar sesión.
 
 **Vendedor**
 - Alta/edición de productos con variantes, fotos adicionales y ofertas (precio anterior tachado).
@@ -30,6 +32,7 @@
 **Admin**
 - Aprobación de comercios y repartidores (CUIT validado).
 - Moderación de productos/comercios/reseñas, CRUD de categorías y cupones.
+- Alta de farmacias y carga de los turnos de farmacia de cada día.
 - Métricas globales (usuarios, ventas, entregas).
 
 ---
