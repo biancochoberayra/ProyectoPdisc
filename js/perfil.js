@@ -1,9 +1,11 @@
 import { supabase, guardPage, showToast } from "./auth-utils.js";
 import { formatPrice, clearCart, updateCartBadge, getFavoriteStoreIds } from "./cart-utils.js";
-import { renderNotificationsSection } from "./notifications-utils.js";
+import { renderNotificationsSection, fetchUnreadCount } from "./notifications-utils.js";
 import { submitReview } from "./reviews-utils.js";
-import { renderSupportSection } from "./support-utils.js";
+import { renderSupportSection, submitSupportTicket } from "./support-utils.js";
 import { initNotificationsBell } from "./nav-utils.js";
+import { PROFILE_FIELDS, todayISO } from "./profile-fields.js";
+import { removeStoredObjects } from "./storage-utils.js";
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
 // --- Referencias al DOM ---
@@ -11,9 +13,9 @@ const sidebarName = document.getElementById("sidebar-name");
 const sidebarEmail = document.getElementById("sidebar-email");
 const sidebarAvatar = document.getElementById("sidebar-avatar");
 
-const cardName = document.getElementById("card-name");
 const cardEmail = document.getElementById("card-email");
 const cardRole = document.getElementById("card-role");
+const cardMemberSince = document.getElementById("card-member-since");
 
 const logoutBtn = document.getElementById("logout-btn");
 const mainContent = document.getElementById("main-content");
@@ -39,41 +41,40 @@ const favoritosContainer = document.getElementById("favoritos-container");
 const favoritosStoresContainer = document.getElementById("favoritos-stores-container");
 const favFilterInput = document.getElementById("fav-filter-input");
 
-// Pestañas
-const navLinks = document.querySelectorAll(".profile-nav__link[data-target]");
+// Hub de secciones (grilla de tarjetas) y panel de la sección abierta
+const accountCards = document.querySelectorAll(".account-card[data-target]");
 const tabPanes = document.querySelectorAll(".tab-pane");
+const accountHub = document.getElementById("account-hub");
+const sectionsWrap = document.getElementById("profile-sections");
+const sectionBack = document.getElementById("section-back");
 
 // Variable global para user_id
 let currentUserId = null;
 
-// --- Lógica de Pestañas (Tabs) ---
-navLinks.forEach(link => {
-  link.addEventListener("click", (e) => {
-    e.preventDefault();
-    const targetId = link.getAttribute("data-target");
-    if (!targetId) return;
+// --- Navegación del hub: la grilla y la sección abierta se turnan ---
+function openSection(targetId) {
+  const targetPane = document.getElementById(targetId);
+  if (!targetPane) return;
 
-    // Quitar active de todos
-    navLinks.forEach(l => l.classList.remove("profile-nav__link--active"));
-    tabPanes.forEach(pane => {
-      pane.style.display = "none";
-      pane.classList.remove("active");
-    });
+  tabPanes.forEach((pane) => pane.classList.remove("active"));
+  targetPane.classList.add("active");
 
-    // Activar el clickeado
-    link.classList.add("profile-nav__link--active");
-    const targetPane = document.getElementById(targetId);
-    if (targetPane) {
-      // Usar grid-column full width para compras/fav/direc, o dejar mis-datos normal
-      targetPane.style.display = targetId === "tab-mis-datos" ? "contents" : "block";
-      if (targetId !== "tab-mis-datos") targetPane.style.gridColumn = "1 / -1";
-      
-      // Forzar reflow para que la animación CSS corra de nuevo
-      void targetPane.offsetWidth;
-      targetPane.classList.add("active");
-    }
-  });
+  if (accountHub) accountHub.style.display = "none";
+  if (sectionsWrap) sectionsWrap.style.display = "block";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function closeSection() {
+  tabPanes.forEach((pane) => pane.classList.remove("active"));
+  if (sectionsWrap) sectionsWrap.style.display = "none";
+  if (accountHub) accountHub.style.display = "grid";
+}
+
+accountCards.forEach((card) => {
+  card.addEventListener("click", () => openSection(card.dataset.target));
 });
+
+if (sectionBack) sectionBack.addEventListener("click", closeSection);
 
 
 // --- Función auxiliar ---
@@ -87,11 +88,10 @@ function renderQuickProfile(user) {
   const quickName = user.user_metadata?.full_name || user.user_metadata?.name || user.email;
   const quickRole = user.app_metadata?.role || "cliente";
 
-  if (mainContent) mainContent.style.display = "grid";
+  if (mainContent) mainContent.style.display = "block";
 
   if (sidebarName) { sidebarName.textContent = quickName || "-"; removeSkeleton(sidebarName); }
   if (sidebarEmail) { sidebarEmail.textContent = user.email || "sin email"; removeSkeleton(sidebarEmail); }
-  if (cardName) { cardName.textContent = quickName || "-"; removeSkeleton(cardName); }
   if (cardEmail) { cardEmail.textContent = user.email || "sin email"; removeSkeleton(cardEmail); }
   if (cardRole) {
     cardRole.textContent = quickRole.charAt(0).toUpperCase() + quickRole.slice(1);
@@ -144,7 +144,7 @@ function renderQuickProfile(user) {
     elevatedOption.value = 'elevated';
     elevatedOption.textContent = jwtRole === 'admin' ? 'Administrador' : 'Moderador';
     roleSwitcher.appendChild(elevatedOption);
-    roleSwitcherWrap.style.display = 'block';
+    roleSwitcherWrap.hidden = false;
 
     roleSwitcher.addEventListener('change', () => {
       if (roleSwitcher.value === 'elevated') {
@@ -377,6 +377,10 @@ if (addressForm) {
 // no hace falta una query nueva").
 let favProductsCache = [];
 let favStoresCache = [];
+/** Categoría elegida en el filtro ('todas' = sin filtrar). */
+let favCategory = 'todas';
+/** Sub-pestaña abierta: el filtro por categoría solo aplica a productos. */
+let favTab = 'productos';
 
 function buildFavProductCard(p) {
   const card = document.createElement('a');
@@ -439,13 +443,110 @@ function renderFavList(container, items, buildCard, emptyText) {
   items.forEach((item) => container.appendChild(buildCard(item)));
 }
 
-/** Filtro client-side por texto (nombre del producto o de la tienda), P1-9. */
+/** Nombre de la categoría de un producto favorito (null si no tiene). */
+function favCategoryOf(product) {
+  return product.categories?.name || null;
+}
+
+/**
+ * Arma los chips de categoría con las que el usuario REALMENTE tiene en
+ * favoritos, con el conteo de cada una. Ofrecer las 14 categorías del sitio
+ * cuando tenés favoritos de dos sería mandar al usuario a filtros vacíos.
+ */
+function renderFavCategoryChips() {
+  const wrap = document.getElementById('fav-categories');
+  if (!wrap) return;
+
+  wrap.textContent = '';
+
+  // El filtro por categoría es de producto: en la pestaña de comercios no va.
+  if (favTab !== 'productos') {
+    wrap.hidden = true;
+    return;
+  }
+
+  const counts = new Map();
+  favProductsCache.forEach((p) => {
+    const name = favCategoryOf(p);
+    if (name) counts.set(name, (counts.get(name) || 0) + 1);
+  });
+
+  // Con una sola categoría (o ninguna) el filtro no filtra nada: se oculta.
+  // No se resetea favCategory acá: esta función corre al final de
+  // applyFavFilter, así que cambiar el filtro sin volver a aplicarlo dejaría
+  // la grilla mostrando un recorte y los chips diciendo otra cosa.
+  if (counts.size < 2) {
+    wrap.hidden = true;
+    return;
+  }
+
+  wrap.hidden = false;
+
+  const sinCategoria = favProductsCache.filter((p) => !favCategoryOf(p)).length;
+  const opciones = [
+    { key: 'todas', label: 'Todas', count: favProductsCache.length },
+    ...[...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))
+      .map(([name, count]) => ({ key: name, label: name, count })),
+  ];
+  if (sinCategoria) opciones.push({ key: '__sin__', label: 'Sin categoría', count: sinCategoria });
+
+  opciones.forEach((op) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'fav-chip' + (favCategory === op.key ? ' fav-chip--active' : '');
+    chip.setAttribute('aria-pressed', String(favCategory === op.key));
+
+    const label = document.createElement('span');
+    label.textContent = op.label;
+    chip.appendChild(label);
+
+    const count = document.createElement('span');
+    count.className = 'fav-chip__count';
+    count.textContent = `(${op.count})`;
+    chip.appendChild(count);
+
+    chip.addEventListener('click', () => {
+      // Volver a tocar la categoría activa la desactiva.
+      favCategory = favCategory === op.key ? 'todas' : op.key;
+      applyFavFilter();
+    });
+
+    wrap.appendChild(chip);
+  });
+}
+
+/** Filtro client-side por texto (P1-9) + por categoría de producto. */
 function applyFavFilter() {
   const q = (favFilterInput?.value || '').trim().toLowerCase();
-  const products = q ? favProductsCache.filter((p) => p.title.toLowerCase().includes(q)) : favProductsCache;
+
+  const clearBtn = document.getElementById('fav-filter-clear');
+  if (clearBtn) clearBtn.hidden = !q;
+
+  let products = favProductsCache;
+  if (favCategory === '__sin__') {
+    products = products.filter((p) => !favCategoryOf(p));
+  } else if (favCategory !== 'todas') {
+    products = products.filter((p) => favCategoryOf(p) === favCategory);
+  }
+  if (q) products = products.filter((p) => p.title.toLowerCase().includes(q));
+
   const stores = q ? favStoresCache.filter((s) => s.name.toLowerCase().includes(q)) : favStoresCache;
-  renderFavList(favoritosContainer, products, buildFavProductCard, q ? 'Sin resultados para tu búsqueda.' : 'Aún no agregaste productos a tus favoritos.');
-  renderFavList(favoritosStoresContainer, stores, buildFavStoreCard, q ? 'Sin resultados para tu búsqueda.' : 'Aún no agregaste comercios a tus favoritos.');
+
+  // El mensaje de vacío distingue "no tenés nada" de "tu filtro no dio nada":
+  // decirle "todavía no agregaste favoritos" a alguien que sí tiene, pero
+  // filtrados, es mentirle.
+  const filtrando = !!q || favCategory !== 'todas';
+  renderFavList(
+    favoritosContainer, products, buildFavProductCard,
+    filtrando ? 'No hay favoritos que coincidan con lo que buscás.' : 'Aún no agregaste productos a tus favoritos.'
+  );
+  renderFavList(
+    favoritosStoresContainer, stores, buildFavStoreCard,
+    q ? 'No hay comercios que coincidan con lo que buscás.' : 'Aún no agregaste comercios a tus favoritos.'
+  );
+
+  renderFavCategoryChips();
 }
 
 /** Sub-pestañas Productos/Comercios dentro de "Mis favoritos" (P1-9). */
@@ -459,12 +560,32 @@ function setupFavSubtabs() {
       [btnProducts, btnStores].forEach((b) => b.classList.remove('fav-subtab-btn--active'));
       btn.classList.add('fav-subtab-btn--active');
       const target = btn.dataset.favTarget;
+      favTab = target === 'favoritos-container' ? 'productos' : 'comercios';
       if (favoritosContainer) favoritosContainer.style.display = target === 'favoritos-container' ? '' : 'none';
       if (favoritosStoresContainer) favoritosStoresContainer.style.display = target === 'favoritos-stores-container' ? '' : 'none';
+      renderFavCategoryChips();
     });
   });
 
   favFilterInput?.addEventListener('input', applyFavFilter);
+
+  const clearBtn = document.getElementById('fav-filter-clear');
+  clearBtn?.addEventListener('click', () => {
+    if (favFilterInput) {
+      favFilterInput.value = '';
+      favFilterInput.focus();
+    }
+    applyFavFilter();
+  });
+
+  // Escape limpia la búsqueda sin tener que ir hasta la "x".
+  favFilterInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && favFilterInput.value) {
+      e.preventDefault();
+      favFilterInput.value = '';
+      applyFavFilter();
+    }
+  });
 }
 
 async function loadFavoritos(userId) {
@@ -482,7 +603,9 @@ async function loadFavoritos(userId) {
     if (wishlist.length > 0) {
       const { data, error } = await supabase
         .from('products')
-        .select('id, title, price, image_url')
+        // categories viene por la FK products.category_id, para el filtro por
+        // categoría (un producto puede no tener, se agrupa en "Sin categoría").
+        .select('id, title, price, image_url, categories(name)')
         .in('id', wishlist)
         .eq('is_active', true);
       if (error) throw error;
@@ -627,9 +750,160 @@ function buildCompraItem(order, reviewByRepartidorId) {
   return item;
 }
 
+const MAX_PROOF_BYTES = 10 * 1024 * 1024;
+
+/** 1536000 -> "1,5 MB". Para que el peso se lea, no se calcule. */
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toLocaleString('es-AR', { maximumFractionDigits: 1 })} MB`;
+}
+
+/**
+ * Selector de comprobante con el estilo del sitio.
+ *
+ * El `<input type="file">` nativo no se puede estilar --cada navegador dibuja
+ * su propio botón "Seleccionar archivo" y su "Ningún archivo seleccionado"--
+ * así que queda oculto y lo dispara una zona propia, igual que ya hacían el
+ * avatar y las fotos de producto. Lo que sí se conserva del nativo es lo
+ * único que aportaba: mostrar qué archivo elegiste.
+ *
+ * Devuelve { element, getFile, onChange }.
+ */
+function buildProofPicker() {
+  const root = document.createElement('div');
+  root.className = 'proof-picker';
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,application/pdf';
+  input.hidden = true;
+
+  const drop = document.createElement('div');
+  drop.className = 'proof-drop';
+  drop.setAttribute('role', 'button');
+  drop.tabIndex = 0;
+  drop.setAttribute('aria-label', 'Elegir el comprobante de pago');
+
+  const dropIcon = document.createElement('i');
+  dropIcon.className = 'fa-solid fa-receipt proof-drop__icon';
+  dropIcon.setAttribute('aria-hidden', 'true');
+  drop.appendChild(dropIcon);
+
+  const dropText = document.createElement('span');
+  dropText.className = 'proof-drop__text';
+  const dropMain = document.createElement('span');
+  dropMain.className = 'proof-drop__main';
+  dropMain.textContent = 'Elegí el comprobante o arrastralo acá';
+  const dropHint = document.createElement('span');
+  dropHint.textContent = 'Una foto o un PDF, hasta 10 MB';
+  dropText.append(dropMain, dropHint);
+  drop.appendChild(dropText);
+
+  // Vista del archivo ya elegido (reemplaza a la zona de arrastre).
+  const chip = document.createElement('div');
+  chip.className = 'proof-file';
+  chip.hidden = true;
+
+  const chipIcon = document.createElement('i');
+  chipIcon.className = 'fa-solid fa-file-lines proof-file__icon';
+  chipIcon.setAttribute('aria-hidden', 'true');
+
+  const chipName = document.createElement('span');
+  chipName.className = 'proof-file__name';
+
+  const chipSize = document.createElement('span');
+  chipSize.className = 'proof-file__size';
+
+  const chipRemove = document.createElement('button');
+  chipRemove.type = 'button';
+  chipRemove.className = 'proof-file__remove';
+  chipRemove.setAttribute('aria-label', 'Quitar el archivo elegido');
+  const removeIcon = document.createElement('i');
+  removeIcon.className = 'fa-solid fa-xmark';
+  removeIcon.setAttribute('aria-hidden', 'true');
+  chipRemove.appendChild(removeIcon);
+
+  chip.append(chipIcon, chipName, chipSize, chipRemove);
+
+  const error = document.createElement('p');
+  error.className = 'compra-proof__message compra-proof__message--error';
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+
+  root.append(drop, chip, input, error);
+
+  let selected = null;
+  let notify = () => {};
+
+  function render() {
+    drop.hidden = !!selected;
+    chip.hidden = !selected;
+    if (selected) {
+      chipName.textContent = selected.name;
+      chipSize.textContent = formatFileSize(selected.size);
+    }
+    notify(selected);
+  }
+
+  function setFile(file) {
+    error.hidden = true;
+    if (!file) {
+      selected = null;
+      render();
+      return;
+    }
+    if (file.size > MAX_PROOF_BYTES) {
+      error.textContent = `Ese archivo pesa ${formatFileSize(file.size)} y el máximo son 10 MB. Probá con una foto más liviana.`;
+      error.hidden = false;
+      selected = null;
+      render();
+      return;
+    }
+    selected = file;
+    render();
+  }
+
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('keydown', (e) => {
+    // Un div con role="button" no responde solo a Enter/Espacio.
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      input.click();
+    }
+  });
+
+  input.addEventListener('change', () => setFile(input.files?.[0] || null));
+
+  chipRemove.addEventListener('click', () => {
+    input.value = '';
+    setFile(null);
+    drop.focus();
+  });
+
+  // Arrastrar y soltar. Sin el preventDefault en dragover el navegador abre
+  // el archivo en una pestaña nueva en vez de soltarlo acá.
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    drop.classList.add('is-over');
+  });
+  drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.classList.remove('is-over');
+    setFile(e.dataTransfer?.files?.[0] || null);
+  });
+
+  return {
+    element: root,
+    getFile: () => selected,
+    onChange: (fn) => { notify = fn; },
+  };
+}
+
 /**
  * F2-04: si la orden es por transferencia y sigue pendiente, muestra el
- * estado del último comprobante (si hay uno) y un input para subir uno
+ * estado del último comprobante (si hay uno) y un selector para subir uno
  * nuevo. El vendedor lo confirma/rechaza desde vender.js.
  */
 function buildPaymentProofSection(order) {
@@ -660,24 +934,22 @@ function buildPaymentProofSection(order) {
     wrap.appendChild(msg);
   }
 
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'image/*,application/pdf';
-  fileInput.className = 'compra-proof__file';
-  wrap.appendChild(fileInput);
+  const picker = buildProofPicker();
+  wrap.appendChild(picker.element);
 
   const uploadBtn = document.createElement('button');
   uploadBtn.type = 'button';
   uploadBtn.className = 'bl-btn bl-btn-primary compra-proof__btn';
   uploadBtn.textContent = 'Subir comprobante';
+  // Deshabilitado hasta que haya archivo: es más claro que dejarlo apretable
+  // para contestar con un toast de reproche.
+  uploadBtn.disabled = true;
+  picker.onChange((file) => { uploadBtn.disabled = !file; });
   wrap.appendChild(uploadBtn);
 
   uploadBtn.addEventListener('click', async () => {
-    const file = fileInput.files?.[0];
-    if (!file) {
-      showToast('Elegí un archivo primero.', 'error');
-      return;
-    }
+    const file = picker.getFile();
+    if (!file) return;
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Subiendo...';
@@ -890,6 +1162,612 @@ async function loadCompras(userId) {
 }
 
 
+// ===========================================================================
+// "Información de tu perfil"
+// ===========================================================================
+// Cada dato es una fila que se edita sola (progressive disclosure): abrir un
+// formulario entero para corregir el teléfono era pedirle al usuario que
+// revise seis campos para tocar uno. Solo una fila abierta a la vez.
+//
+// Los campos se declaran una sola vez en profile-fields.js y el mismo renderer
+// arma la fila de lectura y la de edición -- escribir las cuatro filas a mano
+// era el mismo bloque copiado cuatro veces, con cuatro lugares donde olvidarse
+// el aria-label.
+
+/** Copia local del perfil de la DB; se actualiza al guardar cada fila. */
+let profileData = {};
+/** Fila que está abierta en modo edición (o null). */
+let openEditorKey = null;
+/** Foto que se está mostrando (puede ser la de Google, no solo la nuestra). */
+let displayedAvatarUrl = null;
+
+/** Datos que cuentan para la barra de "perfil completo". */
+const COMPLETION_CHECKS = [
+  { name: "tu nombre", done: (p) => !!p.full_name },
+  { name: "tu teléfono", done: (p) => !!p.phone },
+  { name: "tu documento", done: (p) => !!p.doc_number },
+  { name: "tu fecha de nacimiento", done: (p) => !!p.birth_date },
+  // La de Google también cuenta: se ve igual, sería raro pedirle una foto a
+  // alguien que ya tiene uno puesta.
+  { name: "una foto", done: () => !!displayedAvatarUrl },
+];
+
+function updateCompletionNudge() {
+  const nudge = document.getElementById("datos-nudge");
+  const text = document.getElementById("datos-nudge-text");
+  const bar = document.getElementById("datos-progress-bar");
+  const meter = document.getElementById("datos-progress");
+  if (!nudge || !text || !bar) return;
+
+  const missing = COMPLETION_CHECKS.filter((c) => !c.done(profileData));
+  const pct = Math.round(((COMPLETION_CHECKS.length - missing.length) / COMPLETION_CHECKS.length) * 100);
+
+  bar.style.width = `${pct}%`;
+  if (meter) meter.setAttribute("aria-valuenow", String(pct));
+
+  if (missing.length === 0) {
+    nudge.hidden = true;
+    return;
+  }
+
+  const names = missing.map((m) => m.name);
+  const list = names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
+  text.textContent = `Tu perfil está completo al ${pct}%. Te falta cargar ${list}.`;
+  nudge.hidden = false;
+}
+
+function buildDisplayRow(field) {
+  const row = document.createElement("div");
+  row.className = "datos-row";
+  row.dataset.key = field.key;
+
+  const main = document.createElement("div");
+  main.className = "datos-row__main";
+
+  const label = document.createElement("span");
+  label.className = "datos-row__label";
+  label.textContent = field.label;
+  main.appendChild(label);
+
+  const shown = field.display(profileData);
+  const value = document.createElement("span");
+  value.className = shown ? "datos-row__value" : "datos-row__value datos-row__value--empty";
+  value.textContent = shown || "Sin completar";
+  main.appendChild(value);
+
+  if (field.hint) {
+    const hint = document.createElement("span");
+    hint.className = "datos-row__hint";
+    hint.textContent = field.hint;
+    main.appendChild(hint);
+  }
+
+  row.appendChild(main);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "datos-btn";
+  btn.textContent = shown ? "Editar" : "Completar";
+  // Sin este aria-label, un lector de pantalla anuncia cuatro botones
+  // "Editar" seguidos sin decir cuál es cuál.
+  btn.setAttribute("aria-label", `${shown ? "Editar" : "Completar"} ${field.label.toLowerCase()}`);
+  btn.addEventListener("click", () => openRowEditor(field));
+  row.appendChild(btn);
+
+  return row;
+}
+
+function openRowEditor(field) {
+  // Cerrar la que hubiera abierta re-renderiza las filas, así que la fila a
+  // reemplazar se busca DESPUÉS (la de antes quedaría desconectada del DOM).
+  if (openEditorKey) {
+    openEditorKey = null;
+    renderDatosRows();
+  }
+  const row = document.querySelector(`.datos-row[data-key="${field.key}"]`);
+  if (!row) return;
+
+  const editRow = document.createElement("div");
+  editRow.className = "datos-row datos-row--editing";
+  editRow.dataset.key = field.key;
+
+  const main = document.createElement("div");
+  main.className = "datos-row__main";
+
+  const label = document.createElement("span");
+  label.className = "datos-row__label";
+  label.textContent = field.label;
+  main.appendChild(label);
+
+  const editWrap = document.createElement("div");
+  editWrap.className = "datos-edit";
+  const els = {};
+
+  field.inputs(profileData).forEach((spec) => {
+    let el;
+    if (spec.el === "select") {
+      el = document.createElement("select");
+      spec.options.forEach((opt) => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        el.appendChild(o);
+      });
+    } else {
+      el = document.createElement("input");
+      el.type = spec.type;
+      if (spec.placeholder) el.placeholder = spec.placeholder;
+      if (spec.autocomplete) el.autocomplete = spec.autocomplete;
+      if (spec.inputMode) el.inputMode = spec.inputMode;
+      if (spec.maxLength) el.maxLength = spec.maxLength;
+      if (spec.max) el.max = spec.max;
+    }
+    el.className = spec.className;
+    el.value = spec.value;
+    el.setAttribute("aria-label", spec.aria);
+    els[spec.name] = el;
+    editWrap.appendChild(el);
+  });
+
+  main.appendChild(editWrap);
+
+  if (field.hint) {
+    const hint = document.createElement("span");
+    hint.className = "datos-row__hint";
+    hint.textContent = field.hint;
+    main.appendChild(hint);
+  }
+
+  const error = document.createElement("p");
+  error.className = "datos-row__error";
+  error.setAttribute("role", "alert");
+  error.hidden = true;
+  main.appendChild(error);
+
+  editRow.appendChild(main);
+
+  const actions = document.createElement("div");
+  actions.className = "datos-row__actions";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "datos-btn datos-btn--quiet";
+  cancelBtn.textContent = "Cancelar";
+  actions.appendChild(cancelBtn);
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "datos-btn datos-btn--primary";
+  saveBtn.textContent = "Guardar";
+  actions.appendChild(saveBtn);
+
+  editRow.appendChild(actions);
+
+  const closeEditor = () => {
+    openEditorKey = null;
+    renderDatosRows();
+  };
+
+  const showError = (msg) => {
+    error.textContent = msg;
+    error.hidden = false;
+    Object.values(els).forEach((el) => el.setAttribute("aria-invalid", "true"));
+  };
+
+  cancelBtn.addEventListener("click", closeEditor);
+
+  saveBtn.addEventListener("click", async () => {
+    error.hidden = true;
+    Object.values(els).forEach((el) => el.removeAttribute("aria-invalid"));
+
+    const values = Object.fromEntries(
+      Object.entries(els).map(([name, el]) => [name, el.value])
+    );
+
+    const problem = field.validate(values);
+    if (problem) {
+      showError(problem);
+      Object.values(els)[0]?.focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    saveBtn.textContent = "Guardando…";
+
+    try {
+      const patch = field.collect(values);
+      const { error: dbError } = await supabase
+        .from("profiles")
+        .update(patch)
+        .eq("id", currentUserId);
+      if (dbError) throw dbError;
+
+      Object.assign(profileData, patch);
+      closeEditor();
+      syncProfileHeader();
+      showToast("Listo, lo guardamos.", "success");
+    } catch (err) {
+      console.error("Error al guardar el perfil", err);
+      saveBtn.disabled = false;
+      cancelBtn.disabled = false;
+      saveBtn.textContent = "Guardar";
+      showError(err.message || "No se pudo guardar. Probá de nuevo.");
+    }
+  });
+
+  // Enter guarda, Escape cancela: sin esto, editar con el teclado obliga a
+  // tabular hasta el botón.
+  editRow.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.tagName !== "SELECT") {
+      e.preventDefault();
+      saveBtn.click();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeEditor();
+    }
+  });
+
+  row.replaceWith(editRow);
+  openEditorKey = field.key;
+  Object.values(els)[0]?.focus();
+}
+
+function renderDatosRows() {
+  const containers = {
+    "datos-personales": document.getElementById("datos-personales"),
+    "datos-contacto": document.getElementById("datos-contacto"),
+  };
+  Object.values(containers).forEach((el) => {
+    if (el) el.textContent = "";
+  });
+  PROFILE_FIELDS.forEach((field) => {
+    containers[field.container]?.appendChild(buildDisplayRow(field));
+  });
+  updateCompletionNudge();
+}
+
+/** El encabezado grande tiene que seguir al nombre recién editado. */
+function syncProfileHeader() {
+  if (sidebarName && profileData.full_name) {
+    sidebarName.textContent = profileData.full_name;
+    removeSkeleton(sidebarName);
+  }
+  // La foto no se toca acá: la repintan sus propios botones. Repintarla con
+  // profileData.avatar_url borraría la de Google, que no está en esa columna.
+}
+
+/** Pinta el avatar en el encabezado, en la fila de foto y en el navbar. */
+function paintAvatar(url) {
+  displayedAvatarUrl = url || null;
+  const targets = [sidebarAvatar, document.getElementById("datos-avatar")];
+  targets.forEach((target) => {
+    if (!target) return;
+    removeSkeleton(target);
+    target.textContent = "";
+    if (url) {
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "Tu foto de perfil";
+      img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+      img.onerror = () => {
+        target.textContent = "";
+        const icon = document.createElement("i");
+        icon.className = "fa-regular fa-user";
+        target.appendChild(icon);
+      };
+      target.appendChild(img);
+    } else {
+      const icon = document.createElement("i");
+      icon.className = "fa-regular fa-user";
+      target.appendChild(icon);
+    }
+  });
+
+  // "Quitar" solo si la foto es una que subimos nosotros: la de Google se ve
+  // igual, pero no es nuestra para borrar.
+  const removeBtn = document.getElementById("btn-avatar-remove");
+  if (removeBtn) removeBtn.hidden = !profileData.avatar_url;
+
+  try {
+    if (url) localStorage.setItem("bl_avatar_url", url);
+    else localStorage.removeItem("bl_avatar_url");
+  } catch { /* modo privado: no pasa nada, es solo cache del navbar */ }
+}
+
+// --- Foto de perfil ---
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Borra del bucket la foto anterior. Si la que había era la de Google (u otra
+ * URL externa), removeStoredObjects la ignora sola.
+ */
+async function deleteStoredAvatar(url) {
+  await removeStoredObjects(supabase, "avatars", [url]);
+}
+
+function setupAvatarControls() {
+  const pickBtn = document.getElementById("btn-avatar-pick");
+  const removeBtn = document.getElementById("btn-avatar-remove");
+  const fileInput = document.getElementById("avatar-file");
+  const errorEl = document.getElementById("avatar-error");
+  if (!pickBtn || !fileInput) return;
+
+  const fail = (msg) => {
+    if (!errorEl) return;
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
+  };
+  const clearFail = () => { if (errorEl) errorEl.hidden = true; };
+
+  pickBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    clearFail();
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      fail("Esa imagen pesa más de 2 MB. Probá con una más liviana.");
+      fileInput.value = "";
+      return;
+    }
+
+    pickBtn.disabled = true;
+    pickBtn.textContent = "Subiendo…";
+    const previousUrl = profileData.avatar_url;
+
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").replace(/[^a-zA-Z0-9]/g, "").slice(0, 5);
+      // La carpeta tiene que ser el uid: es lo que exige la policy del bucket.
+      const path = `${currentUserId}/${Date.now()}.${ext || "jpg"}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { contentType: file.type || "image/jpeg" });
+      if (upErr) throw upErr;
+
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = pub?.publicUrl;
+      if (!publicUrl) throw new Error("No se pudo obtener la URL de la foto.");
+
+      const { error: dbErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("id", currentUserId);
+      if (dbErr) throw dbErr;
+
+      profileData.avatar_url = publicUrl;
+      paintAvatar(publicUrl);
+      updateCompletionNudge();
+      await deleteStoredAvatar(previousUrl);
+      showToast("Listo, cambiamos tu foto.", "success");
+    } catch (err) {
+      console.error("Error al subir la foto", err);
+      fail(err.message || "No pudimos subir la foto. Probá de nuevo.");
+    } finally {
+      pickBtn.disabled = false;
+      pickBtn.textContent = "Cambiar foto";
+      fileInput.value = "";
+    }
+  });
+
+  removeBtn?.addEventListener("click", async () => {
+    if (!confirm("¿Sacamos tu foto de perfil?")) return;
+    clearFail();
+    removeBtn.disabled = true;
+    const previousUrl = profileData.avatar_url;
+    try {
+      const { error: dbErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null })
+        .eq("id", currentUserId);
+      if (dbErr) throw dbErr;
+      profileData.avatar_url = null;
+      paintAvatar(null);
+      updateCompletionNudge();
+      await deleteStoredAvatar(previousUrl);
+      showToast("Sacamos tu foto.", "success");
+    } catch (err) {
+      console.error("Error al quitar la foto", err);
+      fail(err.message || "No pudimos sacar la foto. Probá de nuevo.");
+    } finally {
+      removeBtn.disabled = false;
+    }
+  });
+}
+
+// --- Seguridad / cuenta ---
+const PROVIDER_LABELS = {
+  google: "Google",
+  email: "Correo y contraseña",
+};
+
+function renderAccountRows(user) {
+  // Email verificado: si Supabase nunca confirmó el mail, no lo decimos.
+  const verified = document.getElementById("email-verified");
+  if (verified) verified.hidden = !(user.email_confirmed_at || user.confirmed_at);
+
+  const providers = user.app_metadata?.providers || [user.app_metadata?.provider].filter(Boolean);
+  const providerEl = document.getElementById("login-provider");
+  if (providerEl) {
+    providerEl.textContent = providers.length
+      ? providers.map((p) => PROVIDER_LABELS[p] || p).join(" y ")
+      : "Correo y contraseña";
+  }
+
+  // Con Google no hay contraseña nuestra que cambiar.
+  const onlyGoogle = providers.length === 1 && providers[0] === "google";
+  const passBtn = document.getElementById("btn-change-password");
+  const passValue = document.getElementById("password-value");
+  const passHint = document.getElementById("password-hint");
+  if (onlyGoogle) {
+    if (passBtn) passBtn.hidden = true;
+    if (passValue) passValue.textContent = "La maneja Google";
+    if (passHint) passHint.textContent = "Entrás con tu cuenta de Google, así que tu contraseña se cambia desde ahí.";
+  }
+
+  if (cardMemberSince && profileData.created_at) {
+    const since = new Date(profileData.created_at)
+      .toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+    cardMemberSince.textContent = since.charAt(0).toUpperCase() + since.slice(1);
+  }
+
+  passBtn?.addEventListener("click", async () => {
+    passBtn.disabled = true;
+    passBtn.textContent = "Enviando…";
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/pages/login.html`,
+      });
+      if (error) throw error;
+      showToast(`Te mandamos un correo a ${user.email} con el link para cambiarla.`, "success");
+    } catch (err) {
+      console.error("Error al pedir el cambio de contraseña", err);
+      showToast("No pudimos enviar el correo. Probá de nuevo en un rato.", "error");
+    } finally {
+      passBtn.disabled = false;
+      passBtn.textContent = "Cambiar";
+    }
+  });
+}
+
+// --- Privacidad (Ley 25.326: acceso y supresión de los datos propios) ---
+
+/**
+ * Lee el cuerpo del error de una Edge Function. `functions.invoke` no lo
+ * parsea: deja la Response cruda colgada en `error.context`, así que sin esto
+ * el motivo real (409 "tenés un comercio activo") se pierde.
+ */
+async function readFunctionError(error) {
+  const res = error?.context;
+  if (!res || typeof res.json !== "function") return null;
+  try {
+    return { status: res.status, body: await res.json() };
+  } catch {
+    return { status: res.status, body: null };
+  }
+}
+
+/**
+ * Camino viejo: dejar el pedido de baja como ticket para que lo procese un
+ * admin. Queda solo como respaldo por si la Edge Function `delete-account`
+ * todavía no está desplegada en el proyecto.
+ */
+async function requestDeletionByTicket(user) {
+  try {
+    await submitSupportTicket(
+      "Pedido de eliminación de cuenta",
+      `El usuario ${user.email} (${user.id}) pidió eliminar su cuenta y sus datos ` +
+      `desde "Información de tu perfil".`
+    );
+    showToast("Recibimos tu pedido. Te vamos a escribir por correo para confirmarlo.", "success");
+  } catch (err) {
+    console.error("Error al registrar el pedido de baja", err);
+    showToast("No pudimos registrar el pedido. Escribinos desde Soporte, por favor.", "error");
+  }
+}
+
+function setupPrivacyActions(user) {
+  const downloadBtn = document.getElementById("btn-download-data");
+  const deleteBtn = document.getElementById("btn-delete-account");
+
+  downloadBtn?.addEventListener("click", async () => {
+    downloadBtn.disabled = true;
+    const originalText = downloadBtn.textContent;
+    downloadBtn.textContent = "Juntando tus datos…";
+    try {
+      // Todo sale por RLS: cada consulta devuelve solo lo del propio usuario.
+      const [perfil, direcciones, pedidos, favoritos, resenas] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("user_addresses").select("*").eq("user_id", user.id),
+        supabase.from("orders").select("*, order_items(*)").eq("client_id", user.id),
+        supabase.from("favorites").select("*").eq("user_id", user.id),
+        supabase.from("reviews").select("*").eq("client_id", user.id),
+      ]);
+
+      const payload = {
+        exportado_el: new Date().toISOString(),
+        cuenta: { id: user.id, email: user.email, creada_el: user.created_at },
+        perfil: perfil.data ?? null,
+        direcciones: direcciones.data ?? [],
+        pedidos: pedidos.data ?? [],
+        favoritos: favoritos.data ?? [],
+        resenas: resenas.data ?? [],
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mis-datos-baradero-local-${todayISO()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("Descargamos tus datos en un archivo.", "success");
+    } catch (err) {
+      console.error("Error al exportar los datos", err);
+      showToast("No pudimos armar el archivo. Probá de nuevo.", "error");
+    } finally {
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = originalText;
+    }
+  });
+
+  deleteBtn?.addEventListener("click", async () => {
+    const ok = confirm(
+      "Vas a borrar tu cuenta y tus datos.\n\n" +
+      "Se pierden tus favoritos, tus direcciones y tus datos personales. " +
+      "Tus pedidos quedan en el historial del comercio, pero sin tu nombre.\n\n" +
+      "No se puede deshacer. ¿Seguimos?"
+    );
+    if (!ok) return;
+
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = "Dando de baja…";
+
+    try {
+      const { error } = await supabase.functions.invoke("delete-account", { method: "POST" });
+
+      if (!error) {
+        showToast("Listo, borramos tu cuenta. ¡Gracias por haber pasado!", "success");
+        await supabase.auth.signOut();
+        window.location.href = "./home.html";
+        return;
+      }
+
+      const detail = await readFunctionError(error);
+
+      // 409 = la baja no corresponde todavía (tiene comercio activo o pedidos
+      // en curso). Es un motivo entendible, se muestra tal cual.
+      if (detail?.status === 409 && detail.body?.message) {
+        showToast(detail.body.message, "error");
+        return;
+      }
+
+      // Cualquier otro error con respuesta del servidor: mostrarlo y no seguir.
+      if (detail?.status && detail.status !== 404) {
+        showToast(detail.body?.error || "No pudimos completar la baja. Probá de nuevo.", "error");
+        return;
+      }
+
+      // 404: la Edge Function todavía no está desplegada. Se cae al pedido
+      // manual por soporte, que es como funcionaba antes -- así el botón nunca
+      // queda roto mientras tanto.
+      await requestDeletionByTicket(user);
+    } catch (err) {
+      console.error("Error al dar de baja la cuenta", err);
+      await requestDeletionByTicket(user);
+    } finally {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = "Eliminar mi cuenta";
+    }
+  });
+}
+
 // --- Renderizar perfil completo ---
 async function renderFullProfile(user) {
   currentUserId = user.id;
@@ -912,7 +1790,10 @@ async function renderFullProfile(user) {
 
     const roleFromDB = profile.role ?? "cliente";
     const emailToUse = profile.email ?? user.email ?? "sin email";
-    const nameToUse = profile.full_name ?? "-";
+    // Si el perfil no tiene nombre cargado, conservar el que ya pintó
+    // renderQuickProfile desde el JWT (el nombre de Google, o el email como
+    // último recurso): pisarlo con "-" era cambiar un dato bueno por uno peor.
+    const nameToUse = profile.full_name?.trim() || null;
 
     // "Cambiar de rol": la opción "own" del selector representa el rol base
     // real (cliente/vendedor/repartidor, tabla profiles) -- separado del rol
@@ -923,24 +1804,26 @@ async function renderFullProfile(user) {
     }
 
     if (sidebarEmail) sidebarEmail.textContent = emailToUse;
-    if (sidebarName) sidebarName.textContent = nameToUse;
-    if (cardEmail) cardEmail.textContent = emailToUse;
-    if (cardName) cardName.textContent = nameToUse;
+    if (sidebarName && nameToUse) sidebarName.textContent = nameToUse;
+    if (cardEmail) { cardEmail.textContent = emailToUse; removeSkeleton(cardEmail); }
     if (cardRole) cardRole.textContent = roleFromDB.charAt(0).toUpperCase() + roleFromDB.slice(1);
 
-    // Renderizar avatar
-    if (sidebarAvatar && profile.avatar_url) {
-      removeSkeleton(sidebarAvatar);
-      sidebarAvatar.innerHTML = ""; 
-      const img = document.createElement("img");
-      img.src = profile.avatar_url;
-      img.alt = profile.full_name || "Avatar";
-      img.style.cssText = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;";
-      img.onerror = () => { sidebarAvatar.innerHTML = '<i class="fa-regular fa-user"></i>'; };
-      sidebarAvatar.appendChild(img);
-    } else if (sidebarAvatar) {
-      removeSkeleton(sidebarAvatar);
-    }
+    // "Información de tu perfil": filas editables + foto + seguridad + privacidad.
+    profileData = { ...profile };
+
+    // La foto va primero: la barra de "perfil completo" la cuenta, y la de
+    // Google se muestra aunque no esté copiada en profiles (ver paintAvatar).
+    paintAvatar(
+      profile.avatar_url
+      || user.user_metadata?.avatar_url
+      || user.user_metadata?.picture
+      || null
+    );
+
+    renderDatosRows();
+    setupAvatarControls();
+    renderAccountRows(user);
+    setupPrivacyActions(user);
 
     // Llenar formularios de otras pestañas
     loadAddresses(user.id);
@@ -956,6 +1839,13 @@ async function renderFullProfile(user) {
   const notificacionesContainer = document.getElementById("notificaciones-container");
   if (notificacionesContainer) renderNotificationsSection(notificacionesContainer, user.id);
   initNotificationsBell();
+
+  // Aviso en la tarjeta del hub si hay notificaciones sin leer.
+  const notifCardBadge = document.getElementById("notif-card-badge");
+  if (notifCardBadge) {
+    const unread = await fetchUnreadCount(user.id);
+    if (unread > 0) notifCardBadge.style.display = "block";
+  }
   const supportContainer = document.getElementById("support-container");
   if (supportContainer) renderSupportSection(supportContainer);
 }
@@ -992,6 +1882,9 @@ function handleMercadoPagoReturn() {
       : 'Pago en revisión. Te vamos a avisar cuando se confirme.',
     'success'
   );
+
+  // Al volver de Mercado Pago lo que el usuario quiere ver es el pedido, no el hub.
+  openSection('tab-compras');
 
   const url = new URL(window.location);
   url.searchParams.delete('mp');

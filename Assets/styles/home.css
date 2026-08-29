@@ -1115,36 +1115,97 @@ button.coupon-chip:hover {
   box-shadow: 0 0 0 2px rgba(37,99,235,0.1);
 }
 
-.filter-select-wrapper {
-  position: relative;
+/* Las clases .filter-select / .filter-select-wrapper se borraron al pasar el
+   "Ordenar por" del sidebar a .cat-filter-dropdown: envolvían al último
+   <select> nativo que quedaba en la búsqueda y ninguna otra página las usaba. */
+
+/* ── .catpick: grilla de opciones en lugar de un <select> ──
+   Radios (o checkbox) nativos estilados. La usan el alta de producto, el alta
+   de comercio y el alta de repartidor; vive acá y no inline en cada página
+   para tener una sola definición.
+
+   El acento sale de --bl-vendor-accent donde exista (el panel del vendedor
+   define ese token en su :root) y del azul de marca en el resto. */
+.catpick {
+  --catpick-accent: var(--bl-vendor-accent, var(--bl-primary));
+  --catpick-accent-rgb: var(--bl-vendor-accent-rgb, 40, 65, 117);
+  border: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
 }
 
-.filter-select {
-  width: 100%;
-  padding: 0.625rem 2rem 0.625rem 0.75rem;
+/* 130px es el mínimo que entra dos veces en un teléfono de 375px sin que se
+   corte "Carnicería": 2 columnas en vez de 14 filas de scroll. */
+.catpick__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.catpick__opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
   border: 1px solid var(--bl-border);
   border-radius: var(--bl-radius-md);
-  font-size: 0.875rem;
-  font-family: inherit;
-  appearance: none;
   background: var(--bl-surface);
+  font-size: 0.875rem;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
-.filter-select:focus {
-  outline: none;
-  border-color: var(--bl-primary);
+.catpick__opt:hover {
+  border-color: var(--catpick-accent);
+  background: rgba(var(--catpick-accent-rgb), 0.04);
 }
 
-.filter-select-wrapper i {
+/* El radio queda invisible pero SÍ enfocable: con display:none saldría del
+   orden de tabulación y el navegador no podría enfocarlo para mostrar el aviso
+   de campo obligatorio. */
+.catpick__input {
   position: absolute;
-  right: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
   pointer-events: none;
-  color: var(--bl-text-muted);
-  font-size: 0.75rem;
 }
+
+.catpick__opt:has(.catpick__input:focus-visible) {
+  outline: 2px solid var(--catpick-accent);
+  outline-offset: 2px;
+}
+
+.catpick__opt:has(.catpick__input:checked) {
+  border-color: var(--catpick-accent);
+  background: rgba(var(--catpick-accent-rgb), 0.08);
+}
+
+.catpick__icon {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--bl-text-muted);
+  flex-shrink: 0;
+}
+
+.catpick__opt:has(.catpick__input:checked) .catpick__icon { color: var(--catpick-accent); }
+
+.catpick__name { color: var(--bl-text); }
+
+/* La elegida no se distingue solo por color: además lleva tilde. */
+.catpick__check {
+  margin-left: auto;
+  color: var(--catpick-accent);
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.catpick__opt:has(.catpick__input:checked) .catpick__check { opacity: 1; }
+.catpick__opt:has(.catpick__input:checked) .catpick__name { font-weight: 600; }
 
 /* ── Filtro de categoría: dropdown en vez de todas las pills inline ── */
 .cat-filter-dropdown {
@@ -1156,6 +1217,7 @@ button.coupon-chip:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 44px; /* objetivo táctil mínimo: daba 38px */
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--bl-border);
   border-radius: var(--bl-radius-md);
@@ -1198,8 +1260,10 @@ button.coupon-chip:hover {
 }
 
 .cat-filter-dropdown__item {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
+  min-height: 44px; /* objetivo táctil mínimo: daba 33px */
   padding: 0.5rem 0.625rem;
   border: none;
   background: none;
@@ -1208,6 +1272,11 @@ button.coupon-chip:hover {
   color: var(--bl-text);
   text-align: left;
   cursor: pointer;
+}
+
+.cat-filter-dropdown__item:focus-visible {
+  outline: 2px solid var(--bl-primary);
+  outline-offset: -2px;
 }
 
 .cat-filter-dropdown__item:hover {
@@ -1291,6 +1360,28 @@ button.coupon-chip:hover {
 }
 .results-title strong {
   color: var(--bl-primary);
+}
+
+/* Comercios que coinciden con la búsqueda, arriba de los productos. Se separa
+   con una línea para que no se lea como si fueran productos más. */
+.store-results {
+  margin-bottom: 2rem;
+  padding-bottom: 1.75rem;
+  border-bottom: 1px solid var(--bl-border);
+}
+
+.store-results[hidden] { display: none; }
+
+.store-results__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--bl-text);
+  margin-bottom: 1rem;
+}
+
+.store-results__title span {
+  font-weight: 500;
+  color: var(--bl-text-muted);
 }
 
 .active-filters {

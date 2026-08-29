@@ -11,6 +11,7 @@ import {
   renderActiveDeliveriesSection,
   renderCouriersSection,
 } from './dispatch-utils.js';
+import { removeStoredObjects } from './storage-utils.js';
 import './speed-insights.js'; // Initialize Vercel Speed Insights
 
 // --- Verificar si es vendedor y mostrar la vista correcta ---
@@ -95,28 +96,123 @@ async function checkSellerState(user) {
 }
 
 // --- Inicializar formulario y eventos ---
-async function loadCategories() {
-  const select = document.getElementById('shop-category');
-  if (!select) return;
 
+/**
+ * Categorías del sitio. Se cachean porque las usan dos controles distintos
+ * --el select de rubros del alta de comercio y la grilla de categoría del alta
+ * de producto-- y antes el segundo se armaba copiando el HTML del primero, lo
+ * que ataba uno al otro y dependía de cuál se inicializara antes.
+ */
+let categoriesCache = [];
+
+async function loadCategories() {
   const { data: categories, error } = await supabase
     .from('categories')
-    .select('name, slug')
+    .select('name, slug, icon')
     .order('name');
 
   if (error || !categories) {
-    select.innerHTML = '<option value="">Error al cargar rubros</option>';
+    console.error('No se pudieron cargar las categorías:', error);
+    // Sin categorías no se puede completar ninguno de los dos formularios:
+    // conviene decirlo, antes quedaba un "Cargando rubros..." para siempre.
+    ['prod-category-options', 'shop-category-options'].forEach((id) => {
+      const grid = document.getElementById(id);
+      if (grid) grid.textContent = 'No se pudieron cargar los rubros. Recargá la página.';
+    });
     return;
   }
 
-  select.innerHTML = '';
+  categoriesCache = categories;
 
-  categories.forEach(c => {
-    const option = document.createElement('option');
-    option.value = c.slug;
-    option.textContent = c.name;
-    select.appendChild(option);
+  // Los dos controles de categoría se re-dibujan acá: cualquiera de los dos
+  // formularios puede haberse armado antes de que resolviera este fetch, así
+  // que el orden de inicialización deja de importar.
+  renderProductCategoryOptions();
+  renderShopCategoryOptions();
+}
+
+/**
+ * Grilla de categorías. La usan el alta de producto (radio: una sola) y el
+ * alta de comercio (checkbox: uno o más rubros); el marcado y los estilos son
+ * los mismos, solo cambia el tipo de input.
+ */
+function renderCategoryPicker(gridId, { name, type, required = false }) {
+  const grid = document.getElementById(gridId);
+  if (!grid || !categoriesCache.length) return;
+
+  // Conservar lo elegido si ya había algo marcado (ej. al re-dibujar).
+  const previos = new Set(
+    [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((i) => i.value)
+  );
+
+  grid.textContent = '';
+
+  categoriesCache.forEach((c) => {
+    const label = document.createElement('label');
+    label.className = 'catpick__opt';
+
+    const input = document.createElement('input');
+    input.type = type;
+    input.name = name;
+    input.value = c.slug;
+    input.className = 'catpick__input';
+    if (required) input.required = true;
+    if (previos.has(c.slug)) input.checked = true;
+    label.appendChild(input);
+
+    const icon = document.createElement('i');
+    // El ícono viene de la DB; se acota a clases de Font Awesome por las dudas.
+    icon.className = `${(c.icon || 'fa-solid fa-tag').replace(/[^a-zA-Z0-9 -]/g, '')} catpick__icon`;
+    icon.setAttribute('aria-hidden', 'true');
+    label.appendChild(icon);
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'catpick__name';
+    nameEl.textContent = c.name;
+    label.appendChild(nameEl);
+
+    const check = document.createElement('i');
+    check.className = 'fa-solid fa-check catpick__check';
+    check.setAttribute('aria-hidden', 'true');
+    label.appendChild(check);
+
+    grid.appendChild(label);
   });
+}
+
+/** Alta de producto: una sola categoría. */
+function renderProductCategoryOptions() {
+  renderCategoryPicker('prod-category-options', {
+    name: 'prod-category', type: 'radio', required: true,
+  });
+}
+
+/**
+ * Alta de comercio: uno o más rubros. Sin `required` en los checkbox: en un
+ * grupo de checkbox el required es por casilla (obligaría a marcarlas TODAS),
+ * así que el mínimo de uno lo valida el submit, como ya lo hacía.
+ */
+function renderShopCategoryOptions() {
+  renderCategoryPicker('shop-category-options', {
+    name: 'shop-category', type: 'checkbox',
+  });
+}
+
+/** Slug de la categoría elegida en el alta de producto ('' si ninguna). */
+function getProductCategorySlug() {
+  return document.querySelector('input[name="prod-category"]:checked')?.value || '';
+}
+
+/** Marca una categoría (se usa al editar un producto ya guardado). */
+function setProductCategorySlug(slug) {
+  document.querySelectorAll('input[name="prod-category"]').forEach((r) => {
+    r.checked = r.value === slug;
+  });
+}
+
+/** Rubros marcados en el alta de comercio. */
+function getShopCategorySlugs() {
+  return [...document.querySelectorAll('input[name="shop-category"]:checked')].map((i) => i.value);
 }
 
 function initVenderPage(user) {
@@ -135,8 +231,9 @@ function initVenderPage(user) {
     
     const nameInput = document.getElementById('shop-name').value.trim();
     const cuitInput = document.getElementById('shop-cuit').value.trim();
-    // P2-10: shop-category ahora es <select multiple> -- se puede elegir más de un rubro.
-    const categoriesInput = [...document.getElementById('shop-category').selectedOptions].map((o) => o.value).filter(Boolean);
+    // P2-10: se puede elegir más de un rubro (era un <select multiple>, ahora
+    // una grilla de checkbox -- el Ctrl+click no existía en un teléfono).
+    const categoriesInput = getShopCategorySlugs();
     const addressInput = document.getElementById('shop-address').value.trim();
     const phoneInput = document.getElementById('shop-phone').value.trim();
 
@@ -1667,12 +1764,22 @@ function buildPubActions(p) {
   menu.appendChild(pubMenuItem('Eliminar', 'fa-trash', async () => {
     closePubMenus();
     if (!confirm('¿Eliminar producto? (Atención: esto fallará si el producto ya fue comprado por alguien, requiere lógica avanzada en un entorno real)')) return;
+
+    // Las URLs se leen ANTES de borrar: al irse el producto, product_images se
+    // va en cascada y ya no habría forma de saber qué archivos quedaron sueltos.
+    const { data: imgRows } = await supabase
+      .from('product_images')
+      .select('url')
+      .eq('product_id', p.id);
+    const imageUrls = [p.image_url, ...(imgRows || []).map((r) => r.url)];
+
     const { error } = await supabase.from('products').delete().eq('id', p.id);
     if (error) {
       showToast('No se pudo eliminar el producto.', 'error');
       console.error(error);
       return;
     }
+    await removeStoredObjects(supabase, 'products', imageUrls);
     fetchProducts();
   }, true));
 
@@ -1871,7 +1978,7 @@ async function openEditProductForm(productId) {
   document.getElementById('prod-compare-price').value = product.compare_at_price ?? '';
   document.getElementById('prod-offer-expires').value = product.offer_expires_at ?? '';
   document.getElementById('prod-desc').value = product.description || '';
-  document.getElementById('prod-category').value = product.categories?.slug || '';
+  setProductCategorySlug(product.categories?.slug || '');
 
   const formTitle = document.getElementById('add-product-form-title');
   if (formTitle) formTitle.textContent = 'Editar producto';
@@ -1901,6 +2008,14 @@ async function openEditProductForm(productId) {
 let productImages = [];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 let galleryDragFrom = null;
+/**
+ * Fotos que el producto tenía al abrirse el formulario. Al guardar, las que ya
+ * no estén acá se borran del bucket: sin esta foto del "antes" no hay forma de
+ * saber cuáles quitó el vendedor, y quedaban acumulándose en storage.
+ * (No se puede listar la carpeta: el bucket `products` no tiene policy de
+ * SELECT, así que list() devolvería vacío sin avisar.)
+ */
+let savedImageUrlsAtLoad = [];
 
 /** Carga en la galería la portada + las adicionales de un producto ya guardado. */
 async function hydrateProductGallery(product) {
@@ -1916,6 +2031,7 @@ async function hydrateProductGallery(product) {
   if (error) console.error('No se pudieron cargar las fotos del producto:', error);
   (extra || []).forEach((row) => productImages.push({ kind: 'saved', url: row.url }));
 
+  savedImageUrlsAtLoad = productImages.map((item) => item.url);
   renderProductGallery();
 }
 
@@ -1925,6 +2041,7 @@ function resetProductGallery() {
     if (item.kind === 'new') URL.revokeObjectURL(item.previewUrl);
   });
   productImages = [];
+  savedImageUrlsAtLoad = [];
   renderProductGallery();
 }
 
@@ -2077,12 +2194,23 @@ async function persistProductImages(productId) {
   }
 
   const rest = urls.slice(1).map((url, position) => ({ product_id: productId, url, position }));
+  let wroteOk = true;
   if (rest.length) {
     const { error: insertError } = await supabase.from('product_images').insert(rest);
     if (insertError) {
       console.error('No se pudieron guardar las fotos adicionales:', insertError);
       showToast('No se pudieron guardar las fotos adicionales.', 'error');
+      wroteOk = false;
     }
+  }
+
+  // Recién con la DB ya escrita se sabe qué fotos quedaron: las que el vendedor
+  // sacó se borran del bucket. Si la escritura falló no se toca nada -- borrar
+  // un archivo que todavía referencia una fila sería peor que dejar basura.
+  if (wroteOk) {
+    const kept = new Set(urls);
+    await removeStoredObjects(supabase, 'products', savedImageUrlsAtLoad.filter((u) => !kept.has(u)));
+    savedImageUrlsAtLoad = [...urls];
   }
 
   return urls[0] ?? null;
@@ -2194,15 +2322,10 @@ function setupDashboardEvents() {
   const btnCancelAdd = document.getElementById('btn-cancel-add-product');
   const addForm = document.getElementById('add-product-form');
 
-  // Llenar categorías del form
-  const categorySelect = document.getElementById('prod-category');
-  const baseCategorySelect = document.getElementById('shop-category');
-  if (categorySelect && baseCategorySelect) {
-    // prod-category es single-select (un producto va en una sola categoría);
-    // a diferencia de shop-category (P2-10, ahora multiple) necesita un
-    // placeholder vacío para no arrancar con la primera categoría preseleccionada.
-    categorySelect.innerHTML = '<option value="">Seleccioná una categoría...</option>' + baseCategorySelect.innerHTML;
-  }
+  // Grilla de categorías. Antes se armaba copiando el innerHTML del select de
+  // rubros del alta de comercio, lo que ataba un control al otro y dependía de
+  // cuál se inicializara primero; ahora los dos salen de categoriesCache.
+  renderProductCategoryOptions();
 
   function resetProductForm() {
     editingProductId = null;
@@ -2314,7 +2437,7 @@ function setupDashboardEvents() {
     };
 
     // El select guarda el slug de la categoría; hay que resolver el UUID real
-    const slug = document.getElementById('prod-category').value;
+    const slug = getProductCategorySlug();
     const { data: catData } = await supabase.from('categories').select('id').eq('slug', slug).single();
     if (catData) productData.category_id = catData.id;
 

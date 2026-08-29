@@ -324,6 +324,70 @@ export function renderEmptyState(container, message, icon = 'fa-box-open') {
   container.appendChild(wrap);
 }
 
+/**
+ * Tarjeta de comercio con la misma pinta que una de producto, que lleva a la
+ * ficha del comercio. Vive acá porque la usan dos páginas: el listado de
+ * comercios y los resultados de búsqueda.
+ *
+ * `store._topCategory` es opcional (el rubro más común de sus productos); si
+ * no viene, la fila simplemente no se dibuja.
+ */
+export function buildStoreCard(store) {
+  const card = document.createElement('a');
+  card.href = `./comercio.html?id=${encodeURIComponent(store.id)}`;
+  card.className = 'product-card';
+
+  const imageWrap = document.createElement('div');
+  imageWrap.className = 'product-card__image';
+  if (store.logo_url) {
+    const img = document.createElement('img');
+    img.className = 'store-card__logo';
+    img.src = store.logo_url;
+    img.alt = store.name;
+    img.loading = 'lazy';
+    img.onerror = () => { img.src = '/img/no-image.svg'; };
+    imageWrap.appendChild(img);
+  } else {
+    // Sin logo: la inicial del nombre, para que la tarjeta no quede vacía.
+    const fallback = document.createElement('span');
+    fallback.className = 'store-card__logo-fallback';
+    fallback.textContent = (store.name || '?').trim().charAt(0).toUpperCase();
+    imageWrap.appendChild(fallback);
+  }
+  card.appendChild(imageWrap);
+
+  const body = document.createElement('div');
+  body.className = 'product-card__body';
+
+  const name = document.createElement('h3');
+  name.className = 'product-card__name';
+  name.textContent = store.name;
+  body.appendChild(name);
+
+  const meta = document.createElement('div');
+  meta.className = 'store-card__meta';
+  if (store.zone) {
+    const zoneRow = document.createElement('span');
+    const icon = document.createElement('i');
+    icon.className = 'fa-solid fa-location-dot';
+    zoneRow.appendChild(icon);
+    zoneRow.append(store.zone);
+    meta.appendChild(zoneRow);
+  }
+  if (store._topCategory) {
+    const catRow = document.createElement('span');
+    const icon = document.createElement('i');
+    icon.className = 'fa-solid fa-tag';
+    catRow.appendChild(icon);
+    catRow.append(store._topCategory);
+    meta.appendChild(catRow);
+  }
+  body.appendChild(meta);
+
+  card.appendChild(body);
+  return card;
+}
+
 export function showToast(message, type = 'default') {
   const toast = document.getElementById('toast');
   if (!toast) return;

@@ -825,6 +825,12 @@ function initProductModal() {
       const clickedAction = e.target.closest('.product-card__add, .product-card__wishlist');
       if (clickedAction) return;
 
+      // Una tarjeta que ES un enlace tiene que navegar, no abrir el modal: es
+      // el caso de la tarjeta de comercio en los resultados de búsqueda, que
+      // reusa .product-card pero lleva a la ficha del comercio. Las de
+      // producto son <article>, así que nunca entran acá.
+      if (e.target.closest('a[href]')) return;
+
       const card = e.target.closest('.product-card');
       if (card) {
         e.preventDefault();

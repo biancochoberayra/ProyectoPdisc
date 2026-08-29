@@ -6,7 +6,7 @@
 // estado sin resultados con recuperación.
 import { supabase } from './auth-utils.js';
 import './speed-insights.js';
-import { formatPrice, updateCartBadge, showToast, initCartButtons, initWishlist, buildPriceRow, buildShippingBadge, renderErrorState } from './cart-utils.js';
+import { formatPrice, updateCartBadge, showToast, initCartButtons, initWishlist, buildPriceRow, buildShippingBadge, renderErrorState, buildStoreCard } from './cart-utils.js';
 import { initCategoryBar, initSearchBox, initScrollTop, initNavbarScroll, getCategories, addRecentSearch, initNotificationsBell } from './nav-utils.js';
 
 const PAGE_SIZE = 24;
@@ -34,6 +34,79 @@ async function loadShippingThresholds(products) {
   const { data, error } = await supabase.from('stores').select('id, free_shipping_threshold').in('id', missingIds);
   if (error) return; // el badge es cosmético: si falla, simplemente no se muestra
   data.forEach((s) => storeShippingById.set(s.id, s.free_shipping_threshold));
+}
+
+// ── Comercios que coinciden con la búsqueda ─────────────────
+// Si alguien escribe "Don Pedro" está buscando el comercio, no un producto que
+// se llame así; antes la búsqueda solo miraba productos y no lo encontraba.
+//
+// Se traen los comercios aprobados una sola vez y se filtran en memoria, en
+// vez de consultar por cada tecla: son pocos (14 al 2026-08) y así el filtro
+// puede ignorar acentos, que un `ilike` del servidor no hace.
+// ponytail: se cargan todos; si algún día son miles, pasar a un RPC con unaccent.
+let storesCache = null;
+
+/** "Panadería" -> "panaderia", para que "panaderia" encuentre "Panadería". */
+function normalizeText(text) {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+}
+
+async function getStores() {
+  if (storesCache) return storesCache;
+  const { data, error } = await supabase
+    .from('stores')
+    .select('id, name, logo_url, zone, description')
+    .eq('status', 'approved')
+    .order('name');
+  if (error) {
+    console.error('No se pudieron cargar los comercios:', error);
+    storesCache = []; // no se reintenta por tecla: la sección es un extra
+    return storesCache;
+  }
+  storesCache = data || [];
+  return storesCache;
+}
+
+async function renderStoreResults() {
+  const section = document.getElementById('store-results');
+  const storesGrid = document.getElementById('stores-grid');
+  const titleEl2 = document.getElementById('store-results-title');
+  if (!section || !storesGrid) return;
+
+  const q = normalizeText(filterState.query).trim();
+
+  // Solo con texto escrito: filtrar comercios por precio o por categoría de
+  // producto no tiene sentido, y sin consulta la lista sería "todos".
+  if (!q) {
+    section.hidden = true;
+    storesGrid.textContent = '';
+    return 0;
+  }
+
+  const stores = await getStores();
+  const matches = stores.filter((s) =>
+    normalizeText(s.name).includes(q) || normalizeText(s.description).includes(q)
+  );
+
+  storesGrid.textContent = '';
+  if (!matches.length) {
+    section.hidden = true;
+    return 0;
+  }
+
+  if (titleEl2) {
+    titleEl2.textContent = matches.length === 1 ? 'Comercio' : 'Comercios';
+    const count = document.createElement('span');
+    count.textContent = ` (${matches.length})`;
+    titleEl2.appendChild(count);
+  }
+
+  matches.forEach((s) => storesGrid.appendChild(buildStoreCard(s)));
+  section.hidden = false;
+  return matches.length;
 }
 
 // --- Referencias DOM ---
@@ -94,8 +167,11 @@ async function runSearch({ append = false } = {}) {
     renderHeader();
     renderChips();
 
+    // Los comercios no se paginan: solo se recalculan en una búsqueda nueva.
+    const storeMatches = append ? 0 : await renderStoreResults();
+
     if ((!products || products.length === 0) && !append) {
-      renderNoResults();
+      renderNoResults(storeMatches);
       updateLoadMore();
       return;
     }
@@ -201,7 +277,7 @@ function renderChips() {
 }
 
 // ── Estado sin resultados con recuperación ──────────────────
-function renderNoResults() {
+function renderNoResults(storeMatches = 0) {
   grid.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'no-results';
@@ -211,11 +287,20 @@ function renderNoResults() {
   wrap.appendChild(icon);
 
   const h3 = document.createElement('h3');
-  h3.textContent = filterState.query ? `Sin resultados para "${filterState.query}"` : 'No encontramos productos con estos filtros';
+  // Con un comercio encontrado arriba, decir "sin resultados" sería mentira:
+  // hubo resultado, solo que no es un producto.
+  if (storeMatches > 0) {
+    h3.textContent = `No encontramos productos para "${filterState.query}", pero sí ${storeMatches === 1 ? 'el comercio de arriba' : 'los comercios de arriba'}`;
+  } else {
+    h3.textContent = filterState.query ? `Sin resultados para "${filterState.query}"` : 'No encontramos productos con estos filtros';
+  }
   wrap.appendChild(h3);
 
   const tips = document.createElement('ul');
-  ['Probá con términos más generales'].forEach((t) => {
+  const consejo = storeMatches > 0
+    ? 'Entrá al comercio para ver todo lo que vende'
+    : 'Probá con términos más generales';
+  [consejo].forEach((t) => {
     const li = document.createElement('li');
     li.textContent = t;
     tips.appendChild(li);
@@ -338,12 +423,10 @@ function syncPriceInputs() {
   if (maxEl) maxEl.value = filterState.maxPrice ?? '';
 }
 
+/** Refleja en los dos desplegables lo que dice filterState. */
 function syncPills() {
-  const label = document.getElementById('cat-filter-label');
-  if (label) label.textContent = categoryNameBySlug[filterState.category] || 'Todas';
-  document.querySelectorAll('.cat-filter-dropdown__item').forEach((item) => {
-    item.classList.toggle('cat-filter-dropdown__item--active', item.dataset.cat === filterState.category);
-  });
+  catDropdown?.sync();
+  sortDropdown?.sync();
 }
 
 function clearAllFilters() {
@@ -355,64 +438,117 @@ function clearAllFilters() {
   syncInputs();
   syncPriceInputs();
   syncPills();
-  const sortSel = document.getElementById('filter-sort');
-  if (sortSel) sortSel.value = 'relevancia';
   commit();
 }
+
+// ── Desplegables propios del sidebar (categoría y orden) ────
+// Los dos usan el mismo marcado y la misma mecánica --abrir, cerrar al hacer
+// click afuera, cerrar con Escape, marcar la opción activa-- así que se
+// cablean con una sola función en vez de tenerla copiada dos veces.
+//
+// `options` es [{ value, label }]. El de categoría las carga después (llegan
+// de la DB), de ahí setOptions().
+function initFilterDropdown({ rootId, triggerId, menuId, labelId, options = [], getValue, onSelect }) {
+  const root = document.getElementById(rootId);
+  const trigger = document.getElementById(triggerId);
+  const menu = document.getElementById(menuId);
+  const label = document.getElementById(labelId);
+  if (!root || !trigger || !menu) return null;
+
+  let current = options;
+
+  const open = () => {
+    menu.hidden = false;
+    root.classList.add('is-open');
+    trigger.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    menu.hidden = true;
+    root.classList.remove('is-open');
+    trigger.setAttribute('aria-expanded', 'false');
+  };
+
+  function sync() {
+    const value = getValue();
+    const elegida = current.find((o) => o.value === value);
+    if (label) label.textContent = elegida?.label ?? current[0]?.label ?? '';
+    menu.querySelectorAll('.cat-filter-dropdown__item').forEach((item) => {
+      const activa = item.dataset.value === value;
+      item.classList.toggle('cat-filter-dropdown__item--active', activa);
+      // role="option" sin aria-selected no le dice nada al lector de pantalla.
+      item.setAttribute('aria-selected', String(activa));
+    });
+  }
+
+  function render() {
+    menu.textContent = '';
+    current.forEach((op) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'cat-filter-dropdown__item';
+      item.dataset.value = op.value;
+      item.setAttribute('role', 'option');
+      item.textContent = op.label;
+      item.addEventListener('click', () => {
+        onSelect(op.value);
+        close();
+      });
+      menu.appendChild(item);
+    });
+    sync();
+  }
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menu.hidden ? open() : close();
+  });
+  document.addEventListener('click', (e) => {
+    if (!root.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+
+  render();
+  return { sync, close, setOptions: (next) => { current = next; render(); } };
+}
+
+const SORT_OPTIONS = [
+  { value: 'relevancia', label: 'Más relevantes' },
+  { value: 'precio-asc', label: 'Menor precio' },
+  { value: 'precio-desc', label: 'Mayor precio' },
+  { value: 'recientes', label: 'Más recientes' },
+  { value: 'nombre', label: 'Nombre (A-Z)' },
+];
+
+let catDropdown = null;
+let sortDropdown = null;
 
 // ── Filtro de categoría: botón desplegable con todas las categorías
 //    (antes se listaban todas las pills una al lado de otra en el sidebar) ──
 async function renderCategoryPills() {
-  const dropdown = document.getElementById('filter-categories');
-  const trigger = document.getElementById('cat-filter-trigger');
-  const menu = document.getElementById('cat-filter-menu');
-  if (!dropdown || !trigger || !menu) return;
+  catDropdown = initFilterDropdown({
+    rootId: 'filter-categories',
+    triggerId: 'cat-filter-trigger',
+    menuId: 'cat-filter-menu',
+    labelId: 'cat-filter-label',
+    getValue: () => filterState.category,
+    onSelect: (value) => {
+      filterState.category = value;
+      syncPills();
+      commit();
+    },
+  });
+  if (!catDropdown) return;
 
   const categories = await getCategories();
   categoryNameBySlug = Object.fromEntries(categories.map((c) => [c.slug, c.name]));
   categoryNameBySlug['ofertas'] = 'Ofertas';
 
-  menu.textContent = '';
-  const options = [{ slug: 'todas', name: 'Todas' }, ...categories];
-  options.forEach((cat) => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'cat-filter-dropdown__item';
-    item.dataset.cat = cat.slug;
-    item.setAttribute('role', 'option');
-    item.textContent = cat.name;
-    item.addEventListener('click', () => {
-      filterState.category = cat.slug;
-      syncPills();
-      closeCatDropdown();
-      commit();
-    });
-    menu.appendChild(item);
-  });
-
-  function openCatDropdown() {
-    menu.hidden = false;
-    dropdown.classList.add('is-open');
-    trigger.setAttribute('aria-expanded', 'true');
-  }
-  function closeCatDropdown() {
-    menu.hidden = true;
-    dropdown.classList.remove('is-open');
-    trigger.setAttribute('aria-expanded', 'false');
-  }
-
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    menu.hidden ? openCatDropdown() : closeCatDropdown();
-  });
-  document.addEventListener('click', (e) => {
-    if (!dropdown.contains(e.target)) closeCatDropdown();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeCatDropdown();
-  });
-
-  syncPills();
+  catDropdown.setOptions([
+    { value: 'todas', label: 'Todas' },
+    ...categories.map((c) => ({ value: c.slug, label: c.name })),
+  ]);
 }
 
 // ── Filtros avanzados (sidebar) ─────────────────────────────
@@ -420,12 +556,23 @@ function initSidebarFilters() {
   const sidebarInput = document.getElementById('sidebar-search-input');
   const minEl = document.getElementById('filter-price-min');
   const maxEl = document.getElementById('filter-price-max');
-  const sortSel = document.getElementById('filter-sort');
   const mobileBtn = document.getElementById('mobile-filters-btn');
   const sidebarClose = document.getElementById('filters-sidebar-close');
   const sidebar = document.getElementById('filters-sidebar');
 
-  if (sortSel) sortSel.value = filterState.sortBy;
+  sortDropdown = initFilterDropdown({
+    rootId: 'filter-sort',
+    triggerId: 'sort-filter-trigger',
+    menuId: 'sort-filter-menu',
+    labelId: 'sort-filter-label',
+    options: SORT_OPTIONS,
+    getValue: () => filterState.sortBy,
+    onSelect: (value) => {
+      filterState.sortBy = value;
+      syncPills();
+      commit();
+    },
+  });
 
   let searchTimer = null;
   sidebarInput?.addEventListener('input', (e) => {
@@ -446,11 +593,6 @@ function initSidebarFilters() {
   };
   minEl?.addEventListener('input', onPrice);
   maxEl?.addEventListener('input', onPrice);
-
-  sortSel?.addEventListener('change', (e) => {
-    filterState.sortBy = e.target.value;
-    commit();
-  });
 
   mobileBtn?.addEventListener('click', () => sidebar?.classList.add('is-open'));
   sidebarClose?.addEventListener('click', () => sidebar?.classList.remove('is-open'));

@@ -59,8 +59,7 @@ Antes de esta entrada: verificado contra la base real (`list_migrations`, proyec
 `otzhdwuaffcplrveuadc`) el 2026-07-23: **todas las migraciones 01 a 59 ya
 están aplicadas**, incluidas 54-59 que esta lista había dejado de actualizar
 (quedaban registradas como pendientes/no mencionadas pese a estar aplicadas
-desde las sesiones del 2026-07-14 al 2026-07-16 — ver `docs/BACKLOG_MEJORAS.md`
-para el detalle de cada una).
+desde las sesiones del 2026-07-14 al 2026-07-16).
 
 ---
 
@@ -98,5 +97,5 @@ supabase db execute --project-ref otzhdwuaffcplrveuadc < db/schema/55_user_addre
 ## Historial (ya aplicadas, no tocar)
 
 Las migraciones 01 a 59 ya están aplicadas en producción (ver skill
-`progreso-baradero-local` y `docs/BACKLOG_MEJORAS.md` para el detalle de cada
-una). Este archivo solo lista las pendientes.
+`progreso-baradero-local` para el detalle de cada una). Este archivo solo
+lista las pendientes.

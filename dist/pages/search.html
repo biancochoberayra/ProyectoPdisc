@@ -20,14 +20,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <script type="module" crossorigin src="/assets/search-rbLs74r9.js"></script>
+    <script type="module" crossorigin src="/assets/search-B6aQZ0dw.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/speed-insights-DFDjlVMP.js">
-    <link rel="modulepreload" crossorigin href="/assets/nav-utils-XDtJgPYe.js">
+    <link rel="modulepreload" crossorigin href="/assets/nav-utils-ZDKAMkUD.js">
     <link rel="modulepreload" crossorigin href="/assets/reviews-utils-CivoFhuJ.js">
-    <link rel="modulepreload" crossorigin href="/assets/product-modal-Z2-mU_JU.js">
+    <link rel="modulepreload" crossorigin href="/assets/product-modal-D_beSs1J.js">
     <link rel="stylesheet" crossorigin href="/assets/product-modal-hgIgZIpS.css">
-    <link rel="stylesheet" crossorigin href="/assets/carrito-Bwp3lmXO.css">
-    <link rel="stylesheet" crossorigin href="/assets/home-DpC9GIj-.css">
+    <link rel="stylesheet" crossorigin href="/assets/carrito-DrSc7Mg2.css">
+    <link rel="stylesheet" crossorigin href="/assets/home-CsGBJYfe.css">
   </head>
   <body>
 
@@ -120,16 +120,15 @@
             </div>
 
             <div class="filter-group">
-              <label for="filter-sort" class="filter-group__title">Ordenar por</label>
-              <div class="filter-select-wrapper">
-                <select class="filter-select" id="filter-sort">
-                  <option value="relevancia">Más relevantes</option>
-                  <option value="precio-asc">Menor precio</option>
-                  <option value="precio-desc">Mayor precio</option>
-                  <option value="recientes">Más recientes</option>
-                  <option value="nombre">Nombre (A-Z)</option>
-                </select>
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+              <h4 class="filter-group__title" id="sort-group-label">Ordenar por</h4>
+              <!-- Mismo desplegable propio que el de Categoría, en vez de un
+                   <select> nativo. Las opciones las pone search.js. -->
+              <div class="cat-filter-dropdown" id="filter-sort">
+                <button type="button" class="cat-filter-dropdown__trigger" id="sort-filter-trigger" aria-haspopup="true" aria-expanded="false" aria-labelledby="sort-group-label">
+                  <span id="sort-filter-label">Más relevantes</span>
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="cat-filter-dropdown__menu" id="sort-filter-menu" role="listbox" hidden></div>
               </div>
             </div>
 
@@ -141,6 +140,14 @@
               <span class="catalog-count" id="catalog-count"></span>
             </div>
             <div class="active-filters" id="active-filters"></div>
+
+            <!-- Comercios que coinciden con la búsqueda. Van arriba de los
+                 productos: si alguien escribe el nombre de un comercio, lo que
+                 busca es el comercio. Lo llena search.js. -->
+            <section class="store-results" id="store-results" hidden>
+              <h3 class="store-results__title" id="store-results-title">Comercios</h3>
+              <div class="products__grid" id="stores-grid"></div>
+            </section>
 
             <div class="products__grid" id="products-grid">
 
@@ -222,7 +229,7 @@
             <a href="./info.html" class="footer__link">Contacto</a>
             <a href="./info.html" class="footer__link">Preguntas frecuentes</a>
             <a href="./info.html" class="footer__link">Devoluciones</a>
-            <a href="./info.html" class="footer__link">Términos</a>
+            <a href="./terminos.html" class="footer__link">Términos</a>
           </nav>
         </div>
       </div>

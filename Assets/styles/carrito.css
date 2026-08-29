@@ -409,6 +409,82 @@
   padding: 0.25rem 0;
 }
 
+/* Sin esto el radio sale con el violeta por defecto del navegador, que no es
+   de la paleta y desentonaba con las opciones de dirección de abajo. */
+.delivery-option input {
+  accent-color: var(--bl-primary);
+}
+
+/* ── Direcciones guardadas ──
+   Reemplazan al <select> que recortaba el texto de cada dirección. El radio va
+   visible (no oculto como en .catpick) porque acá conviven con los radios de
+   retiro/envío de arriba y tienen que leerse como el mismo tipo de elección. */
+.addr-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
+.addr-options[hidden] { display: none; }
+
+.addr-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--bl-border);
+  border-radius: var(--bl-radius-md);
+  background: var(--bl-surface);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.addr-option:hover { border-color: var(--bl-primary); }
+
+.addr-option:has(input:checked) {
+  border-color: var(--bl-primary);
+  background: rgba(40, 65, 117, 0.05);
+}
+
+.addr-option:has(input:focus-visible) {
+  outline: 2px solid var(--bl-primary);
+  outline-offset: 2px;
+}
+
+.addr-option input {
+  margin: 0.15rem 0 0;
+  flex-shrink: 0;
+  accent-color: var(--bl-primary);
+}
+
+.addr-option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.addr-option__label {
+  font-weight: 600;
+  color: var(--bl-text);
+}
+
+.addr-option__tag {
+  margin-left: 0.35rem;
+  font-weight: 500;
+  font-size: 0.6875rem;
+  color: var(--bl-success);
+}
+
+/* La dirección puede ser larga: envuelve, no se recorta (ese era justamente el
+   problema del <select>). */
+.addr-option__text {
+  color: var(--bl-text-secondary);
+  overflow-wrap: anywhere;
+}
+
 .coupon-btn {
   padding: 0 1rem;
   background: var(--bl-primary-deeper);

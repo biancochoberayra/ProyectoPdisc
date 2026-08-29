@@ -8,67 +8,15 @@
  * nav-utils.js, grilla con .product-card reutilizada de home.css.
  */
 import { supabase } from './auth-utils.js';
-import { updateCartBadge, renderErrorState, renderEmptyState } from './cart-utils.js';
+import { updateCartBadge, renderErrorState, renderEmptyState, buildStoreCard } from './cart-utils.js';
 import { initCategoryBar, initSearchBox, initScrollTop, initNavbarScroll, initNotificationsBell } from './nav-utils.js';
 import './speed-insights.js';
 
 const grid = document.getElementById('stores-grid');
 const countEl = document.getElementById('stores-count');
 
-function buildStoreCard(store) {
-  const card = document.createElement('a');
-  card.href = `./comercio.html?id=${encodeURIComponent(store.id)}`;
-  card.className = 'product-card';
-
-  const imageWrap = document.createElement('div');
-  imageWrap.className = 'product-card__image';
-  if (store.logo_url) {
-    const img = document.createElement('img');
-    img.className = 'store-card__logo';
-    img.src = store.logo_url;
-    img.alt = store.name;
-    img.loading = 'lazy';
-    img.onerror = () => { img.src = '/img/no-image.svg'; };
-    imageWrap.appendChild(img);
-  } else {
-    const fallback = document.createElement('span');
-    fallback.className = 'store-card__logo-fallback';
-    fallback.textContent = (store.name || '?').trim().charAt(0).toUpperCase();
-    imageWrap.appendChild(fallback);
-  }
-  card.appendChild(imageWrap);
-
-  const body = document.createElement('div');
-  body.className = 'product-card__body';
-
-  const name = document.createElement('h3');
-  name.className = 'product-card__name';
-  name.textContent = store.name;
-  body.appendChild(name);
-
-  const meta = document.createElement('div');
-  meta.className = 'store-card__meta';
-  if (store.zone) {
-    const zoneRow = document.createElement('span');
-    const icon = document.createElement('i');
-    icon.className = 'fa-solid fa-location-dot';
-    zoneRow.appendChild(icon);
-    zoneRow.append(store.zone);
-    meta.appendChild(zoneRow);
-  }
-  if (store._topCategory) {
-    const catRow = document.createElement('span');
-    const icon = document.createElement('i');
-    icon.className = 'fa-solid fa-tag';
-    catRow.appendChild(icon);
-    catRow.append(store._topCategory);
-    meta.appendChild(catRow);
-  }
-  body.appendChild(meta);
-
-  card.appendChild(body);
-  return card;
-}
+// buildStoreCard vive en cart-utils.js: la usan este listado y los resultados
+// de búsqueda.
 
 async function loadStores() {
   try {

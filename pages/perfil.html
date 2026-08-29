@@ -47,131 +47,221 @@
 
     <!-- ====== CONTENIDO DEL PERFIL ====== -->
     <div class="profile-container" id="main-content" style="display: none;">
-      
-      <!-- Menú Lateral -->
-      <aside class="profile-sidebar">
-        <div class="profile-sidebar__header">
-          <div class="profile-avatar-large skeleton skeleton-avatar" id="sidebar-avatar">
-            <i class="fa-regular fa-user"></i>
-          </div>
-          <p class="profile-sidebar__name skeleton skeleton-text" id="sidebar-name">Cargando...</p>
-          <p class="profile-sidebar__email skeleton skeleton-text skeleton-text-short" id="sidebar-email"></p>
-        </div>
-        <nav class="profile-nav" role="navigation" aria-label="Menú de perfil">
-          <a href="#" class="profile-nav__link profile-nav__link--active" data-target="tab-mis-datos">
-            <i class="fa-solid fa-id-card"></i> <span>Mis datos</span>
-          </a>
-          <a href="#" class="profile-nav__link" data-target="tab-notificaciones">
-            <i class="fa-solid fa-bell"></i> <span>Notificaciones</span>
-          </a>
-          <a href="#" class="profile-nav__link" data-target="tab-compras">
-            <i class="fa-solid fa-box-open"></i> <span>Mis compras</span>
-          </a>
-          <a href="#" class="profile-nav__link" data-target="tab-favoritos">
-            <i class="fa-solid fa-heart"></i> <span>Favoritos</span>
-          </a>
-          <a href="#" class="profile-nav__link" data-target="tab-direcciones">
-            <i class="fa-solid fa-location-dot"></i> <span>Direcciones</span>
-          </a>
-          <a href="#" class="profile-nav__link" data-target="tab-soporte">
-            <i class="fa-solid fa-headset"></i> <span>Soporte</span>
-          </a>
-          <hr style="border:none; border-top: 1px solid var(--bl-perfil-border); margin: 0.5rem 0;" />
-          <a href="#" class="profile-nav__link profile-nav__link--danger" id="logout-btn">
-            <i class="fa-solid fa-right-from-bracket"></i> <span>Cerrar sesión</span>
-          </a>
-        </nav>
-      </aside>
 
-      <!-- Panel Principal -->
-      <main class="profile-content">
-        
+      <!-- Encabezado: quién sos -->
+      <header class="profile-header">
+        <div class="profile-avatar-large skeleton skeleton-avatar" id="sidebar-avatar">
+          <i class="fa-regular fa-user"></i>
+        </div>
+        <div class="profile-header__info">
+          <h1 class="profile-header__name skeleton skeleton-text" id="sidebar-name">Cargando...</h1>
+          <p class="profile-header__email skeleton skeleton-text skeleton-text-short" id="sidebar-email"></p>
+        </div>
+      </header>
+
+      <!-- Hub: grilla de secciones de la cuenta -->
+      <div class="account-grid" id="account-hub">
+        <button type="button" class="account-card" data-target="tab-mis-datos">
+          <i class="fa-regular fa-id-card account-card__icon"></i>
+          <span class="account-card__title">Información de tu perfil</span>
+          <span class="account-card__desc">Datos personales y de tu cuenta.</span>
+        </button>
+        <button type="button" class="account-card" data-target="tab-notificaciones">
+          <i class="fa-regular fa-bell account-card__icon"></i>
+          <span class="account-card__badge" id="notif-card-badge" style="display: none;">!</span>
+          <span class="account-card__title">Notificaciones</span>
+          <span class="account-card__desc">Novedades de tus pedidos y comercios.</span>
+        </button>
+        <button type="button" class="account-card" data-target="tab-compras">
+          <i class="fa-solid fa-box-open account-card__icon"></i>
+          <span class="account-card__title">Mis compras</span>
+          <span class="account-card__desc">Seguí el estado de tus pedidos.</span>
+        </button>
+        <button type="button" class="account-card" data-target="tab-favoritos">
+          <i class="fa-regular fa-heart account-card__icon"></i>
+          <span class="account-card__title">Favoritos</span>
+          <span class="account-card__desc">Productos y comercios que guardaste.</span>
+        </button>
+        <button type="button" class="account-card" data-target="tab-direcciones">
+          <i class="fa-solid fa-location-dot account-card__icon"></i>
+          <span class="account-card__title">Direcciones</span>
+          <span class="account-card__desc">Direcciones guardadas en tu cuenta.</span>
+        </button>
+        <button type="button" class="account-card" data-target="tab-soporte">
+          <i class="fa-regular fa-comment account-card__icon"></i>
+          <span class="account-card__title">Soporte</span>
+          <span class="account-card__desc">¿Necesitás una mano? Escribinos.</span>
+        </button>
+        <a href="./vender.html" class="account-card">
+          <i class="fa-solid fa-shop account-card__icon"></i>
+          <span class="account-card__title">Vendé en Baradero Local</span>
+          <span class="account-card__desc">Publicá los productos de tu comercio.</span>
+        </a>
+        <!-- "Repartí con nosotros" dejó de ser una puerta de entrada pública con
+             el modelo de logística de terceros: al cadete lo da de alta su
+             operador (add_courier) y repartidor.html ahora exige rol. Estas dos
+             tarjetas arrancan ocultas y las muestra perfil.js solo si el JWT
+             trae el rol; a un cliente común lo mandarían a un rebote a home.
+             Ver db/schema/64_close_delivery_access.sql. -->
+        <a href="./repartidor.html" class="account-card" id="quick-btn-repartidor" style="display: none;">
+          <i class="fa-solid fa-truck-fast account-card__icon"></i>
+          <span class="account-card__title">Mis entregas</span>
+          <span class="account-card__desc">Los pedidos que te asignó tu operador.</span>
+        </a>
+        <a href="./logistica.html" class="account-card" id="quick-btn-logistica" style="display: none;">
+          <i class="fa-solid fa-truck-ramp-box account-card__icon"></i>
+          <span class="account-card__title">Panel de logística</span>
+          <span class="account-card__desc">Pedidos disponibles y tus cadetes.</span>
+        </a>
+      </div>
+
+      <!-- Panel de la sección abierta -->
+      <main class="profile-content" id="profile-sections" style="display: none;">
+        <button type="button" class="section-back" id="section-back">
+          <i class="fa-solid fa-arrow-left"></i> Volver a mi perfil
+        </button>
+
         <!-- ======================= -->
         <!-- PESTAÑA: MIS DATOS      -->
         <!-- ======================= -->
-        <div id="tab-mis-datos" class="tab-pane active" style="display: contents;">
-          <!-- Tarjeta: Info Personal -->
-          <article class="perfil-card">
-            <h2 class="perfil-card__title">
-              <i class="fa-solid fa-user-pen"></i> Información personal
-            </h2>
-            <div class="detail-list">
-              <div class="detail-item">
-                <span class="detail-label">Nombre y apellido</span>
-                <span class="detail-value skeleton skeleton-text" id="card-name">Cargando nombre</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Correo electrónico</span>
-                <span class="detail-value skeleton skeleton-text" id="card-email">cargando@email.com</span>
-              </div>
-            </div>
-          </article>
+        <div id="tab-mis-datos" class="tab-pane">
 
-          <!-- Tarjeta: Nivel / Beneficios -->
-          <article class="perfil-card">
-            <h2 class="perfil-card__title">
-              <i class="fa-solid fa-award"></i> Mi cuenta
-            </h2>
-            <div class="detail-list" style="align-items: flex-start;">
-              <div class="detail-item">
-                <span class="detail-label" style="margin-bottom: 0.5rem;">Rol actual</span>
-                <div class="level-badge skeleton" id="card-role">Cargando rol...</div>
-              </div>
-              <div id="role-switcher-wrap" style="display: none; margin-top: 0.5rem;">
-                <label for="role-switcher" class="detail-label" style="display: block; margin-bottom: 0.4rem;">Cambiar de rol</label>
-                <select id="role-switcher" class="bl-input" style="max-width: 240px;">
-                  <option value="own">Mi cuenta (cliente/vendedor)</option>
-                </select>
-              </div>
-              <p style="color: var(--bl-perfil-text-sec); font-size: 0.875rem; margin-top: 1rem;">
-                Disfrutá de todos los beneficios de comprar en comercios locales con Baradero Local.
-              </p>
-            </div>
-          </article>
+          <header class="datos-intro">
+            <h2 class="datos-intro__title">Información de tu perfil</h2>
+            <p class="datos-intro__lead">
+              Con estos datos el comercio sabe quién hizo el pedido y el repartidor a quién entregárselo.
+              Solo los ve el comercio donde comprás.
+            </p>
+          </header>
 
-          <!-- Tarjeta: Accesos Rápidos (Full width) -->
-          <article class="perfil-card perfil-card--full">
-            <h2 class="perfil-card__title">
-              <i class="fa-solid fa-bolt"></i> Accesos rápidos
-            </h2>
-            <div class="quick-access-grid">
-              <a href="./home.html" class="quick-btn">
-                <i class="fa-solid fa-store"></i>
-                Ir a comprar
-              </a>
-              <a href="./search.html" class="quick-btn">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                Buscar productos
-              </a>
-              <a href="./carrito.html" class="quick-btn">
-                <i class="fa-solid fa-cart-shopping"></i>
-                Mi carrito
-              </a>
-              <a href="./vender.html" class="quick-btn">
-                <i class="fa-solid fa-shop"></i>
-                Quiero vender
-              </a>
-              <!-- "Quiero repartir" se quitó con el modelo de logística de
-                   terceros: repartidor.html dejó de ser una página de alta
-                   pública y ahora exige rol. Un cliente que la viera acá se
-                   comería un rebote a home. -->
-              <a href="./repartidor.html" class="quick-btn" id="quick-btn-repartidor" style="display: none;">
-                <i class="fa-solid fa-truck-fast"></i>
-                Mis entregas
-              </a>
-              <a href="./logistica.html" class="quick-btn" id="quick-btn-logistica" style="display: none;">
-                <i class="fa-solid fa-truck-ramp-box"></i>
-                Panel de logística
-              </a>
+          <!-- Aviso de perfil incompleto. Lo muestra el JS solo si falta algo. -->
+          <div class="datos-nudge" id="datos-nudge" hidden>
+            <i class="fa-solid fa-circle-exclamation datos-nudge__icon" aria-hidden="true"></i>
+            <div class="datos-nudge__body">
+              <p class="datos-nudge__text" id="datos-nudge-text"></p>
+              <div class="datos-progress" role="progressbar" aria-labelledby="datos-nudge-text" aria-valuemin="0" aria-valuemax="100" id="datos-progress">
+                <span class="datos-progress__bar" id="datos-progress-bar"></span>
+              </div>
             </div>
-          </article>
+          </div>
+
+          <!-- ---------- Foto ---------- -->
+          <section class="datos-group">
+            <h3 class="datos-group__title">Tu foto</h3>
+            <div class="datos-panel">
+              <div class="datos-photo">
+                <div class="datos-photo__frame" id="datos-avatar">
+                  <i class="fa-regular fa-user" aria-hidden="true"></i>
+                </div>
+                <div class="datos-photo__body">
+                  <p class="datos-photo__hint">
+                    Aparece cuando dejás una reseña o le escribís a un comercio. Formato JPG o PNG, hasta 2 MB.
+                  </p>
+                  <div class="datos-photo__actions">
+                    <button type="button" class="datos-btn" id="btn-avatar-pick">Cambiar foto</button>
+                    <button type="button" class="datos-btn datos-btn--quiet" id="btn-avatar-remove" hidden>Quitar</button>
+                  </div>
+                  <p class="datos-row__error" id="avatar-error" role="alert" hidden></p>
+                </div>
+                <input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp" hidden />
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- Datos personales (filas editables, las arma el JS) ---------- -->
+          <section class="datos-group">
+            <h3 class="datos-group__title">Datos personales</h3>
+            <div class="datos-panel" id="datos-personales"></div>
+          </section>
+
+          <!-- ---------- Contacto ---------- -->
+          <section class="datos-group">
+            <h3 class="datos-group__title">Contacto</h3>
+            <div class="datos-panel">
+              <div class="datos-row datos-row--static">
+                <div class="datos-row__main">
+                  <span class="datos-row__label">Correo electrónico</span>
+                  <span class="datos-row__value skeleton skeleton-text" id="card-email">cargando@email.com</span>
+                  <span class="datos-row__hint">Es con el que entrás a tu cuenta. Para cambiarlo, escribinos desde Soporte.</span>
+                </div>
+                <span class="datos-tag" id="email-verified" hidden>
+                  <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Verificado
+                </span>
+              </div>
+              <div class="datos-panel__rows" id="datos-contacto"></div>
+            </div>
+          </section>
+
+          <!-- ---------- Seguridad ---------- -->
+          <section class="datos-group">
+            <h3 class="datos-group__title">Seguridad</h3>
+            <div class="datos-panel">
+              <div class="datos-row datos-row--static">
+                <div class="datos-row__main">
+                  <span class="datos-row__label">Contraseña</span>
+                  <span class="datos-row__value" id="password-value">••••••••</span>
+                  <span class="datos-row__hint" id="password-hint">Te mandamos un correo con el link para cambiarla.</span>
+                </div>
+                <button type="button" class="datos-btn" id="btn-change-password">Cambiar</button>
+              </div>
+              <div class="datos-row datos-row--static">
+                <div class="datos-row__main">
+                  <span class="datos-row__label">Entrás con</span>
+                  <span class="datos-row__value" id="login-provider">—</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- Cuenta ---------- -->
+          <section class="datos-group">
+            <h3 class="datos-group__title">Tu cuenta</h3>
+            <div class="datos-panel">
+              <div class="datos-row datos-row--static">
+                <div class="datos-row__main">
+                  <span class="datos-row__label">Tipo de cuenta</span>
+                  <span class="datos-row__value" id="card-role">Cargando…</span>
+                </div>
+                <div id="role-switcher-wrap" hidden>
+                  <label for="role-switcher" class="sr-only">Cambiar de rol</label>
+                  <select id="role-switcher" class="datos-input datos-input--compact">
+                    <option value="own">Mi cuenta (cliente/vendedor)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="datos-row datos-row--static">
+                <div class="datos-row__main">
+                  <span class="datos-row__label">Comprás en Baradero Local desde</span>
+                  <span class="datos-row__value" id="card-member-since">—</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ---------- Privacidad: separado a propósito del resto ---------- -->
+          <section class="datos-group datos-group--privacy">
+            <h3 class="datos-group__title">Tus datos son tuyos</h3>
+            <p class="datos-privacy__lead">
+              Podés llevarte una copia de todo lo que guardamos, o borrar tu cuenta cuando quieras
+              (Ley 25.326 de Protección de Datos Personales).
+            </p>
+            <div class="datos-privacy__actions">
+              <button type="button" class="datos-btn" id="btn-download-data">
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Descargar mis datos
+              </button>
+              <button type="button" class="datos-btn datos-btn--danger" id="btn-delete-account">
+                Eliminar mi cuenta
+              </button>
+            </div>
+          </section>
+
         </div>
 
         <!-- ======================= -->
         <!-- PESTAÑA: NOTIFICACIONES -->
         <!-- ======================= -->
-        <div id="tab-notificaciones" class="tab-pane" style="display: none; grid-column: 1 / -1;">
-          <article class="perfil-card perfil-card--full">
+        <div id="tab-notificaciones" class="tab-pane">
+          <article class="perfil-card">
             <h2 class="perfil-card__title">
               <i class="fa-solid fa-bell"></i> Notificaciones
             </h2>
@@ -185,8 +275,8 @@
         <!-- ======================= -->
         <!-- PESTAÑA: MIS COMPRAS    -->
         <!-- ======================= -->
-        <div id="tab-compras" class="tab-pane" style="display: none; grid-column: 1 / -1;">
-          <article class="perfil-card perfil-card--full">
+        <div id="tab-compras" class="tab-pane">
+          <article class="perfil-card">
             <h2 class="perfil-card__title">
               <i class="fa-solid fa-box-open"></i> Mi historial de compras
             </h2>
@@ -200,8 +290,8 @@
         <!-- ======================= -->
         <!-- PESTAÑA: FAVORITOS      -->
         <!-- ======================= -->
-        <div id="tab-favoritos" class="tab-pane" style="display: none; grid-column: 1 / -1;">
-          <article class="perfil-card perfil-card--full">
+        <div id="tab-favoritos" class="tab-pane">
+          <article class="perfil-card">
             <h2 class="perfil-card__title">
               <i class="fa-solid fa-heart" style="color: #ef4444;"></i> Mis favoritos
             </h2>
@@ -211,7 +301,18 @@
               <button type="button" id="fav-subtab-products" class="fav-subtab-btn fav-subtab-btn--active" data-fav-target="favoritos-container">Productos</button>
               <button type="button" id="fav-subtab-stores" class="fav-subtab-btn" data-fav-target="favoritos-stores-container">Comercios</button>
             </div>
-            <input type="text" id="fav-filter-input" class="form-input" placeholder="Buscar en mis favoritos..." style="margin-bottom: 1rem;" />
+            <div class="fav-search">
+              <i class="fa-solid fa-magnifying-glass fav-search__icon" aria-hidden="true"></i>
+              <label class="sr-only" for="fav-filter-input">Buscar en mis favoritos</label>
+              <input type="search" id="fav-filter-input" class="fav-search__input" placeholder="Buscar en mis favoritos" autocomplete="off" />
+              <button type="button" class="fav-search__clear" id="fav-filter-clear" aria-label="Borrar la búsqueda" hidden>
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <!-- Filtro por categoría. Solo aplica a productos; lo arma el JS con
+                 las categorías que el usuario realmente tiene en favoritos. -->
+            <div class="fav-chips" id="fav-categories" role="group" aria-label="Filtrar por categoría"></div>
             <div id="favoritos-container" class="favoritos-grid">
               <!-- Renderizado por JS -->
               <p style="color: var(--bl-perfil-text-sec);">Cargando tus favoritos...</p>
@@ -225,8 +326,8 @@
         <!-- ======================= -->
         <!-- PESTAÑA: DIRECCIONES    -->
         <!-- ======================= -->
-        <div id="tab-direcciones" class="tab-pane" style="display: none; grid-column: 1 / -1;">
-          <article class="perfil-card perfil-card--full">
+        <div id="tab-direcciones" class="tab-pane">
+          <article class="perfil-card">
             <h2 class="perfil-card__title">
               <i class="fa-solid fa-location-dot"></i> Direcciones de envío
             </h2>
@@ -268,8 +369,8 @@
         <!-- ======================= -->
         <!-- PESTAÑA: SOPORTE        -->
         <!-- ======================= -->
-        <div id="tab-soporte" class="tab-pane" style="display: none; grid-column: 1 / -1;">
-          <article class="perfil-card perfil-card--full">
+        <div id="tab-soporte" class="tab-pane">
+          <article class="perfil-card">
             <h2 class="perfil-card__title">
               <i class="fa-solid fa-headset"></i> Soporte
             </h2>
@@ -278,6 +379,10 @@
         </div>
 
       </main>
+
+      <p class="profile-footer">
+        Podés <button type="button" class="profile-footer__link" id="logout-btn">cerrar sesión</button> cuando quieras.
+      </p>
 
     </div>
 

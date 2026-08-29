@@ -593,7 +593,7 @@ qué se tocó y qué no, en [docs/DISENOS_PROVISIONALES.md](docs/DISENOS_PROVISI
 se reemplazan cuando el usuario traiga sus propios diseños, no son decisiones finales.
 
 ## P1-6: cupones de vendedor ya no se listan en bloque públicamente (2026-07-16)
-Del backlog de mejoras post-lanzamiento (`docs/BACKLOG_MEJORAS.md`, punto #16a). Antes,
+Del backlog de mejoras post-lanzamiento (punto #16a). Antes,
 `coupons_select_public` dejaba leer CUALQUIER cupón activo (global o de un vendedor puntual, F12-03)
 a cualquier `anon`/`authenticated` — `renderActiveCoupons()` (F12-07) los mostraba todos en el home
 a cualquier visitante, sin relación con lo que estuviera comprando; y cualquiera con la anon key
@@ -618,7 +618,7 @@ podía listar por API directa el código/% de descuento de todos los vendedores.
   (`validate_coupon_code` invocable por `anon`, mismo patrón ya aceptado que `validate_cart_prices`).
 
 ## P1-7: UX del cupón en el carrito — aplicar al escribir + borrar intuitivo (2026-07-16)
-Del backlog de mejoras post-lanzamiento (`docs/BACKLOG_MEJORAS.md`, punto #16b). Sin migración,
+Del backlog de mejoras post-lanzamiento (punto #16b). Sin migración,
 100% frontend (`js/carrito.js`, `initCouponEvents`). Antes había que escribir el código Y clickear
 "Aplicar" (o Enter); ahora un listener de `input` con debounce de 500ms lo valida solo con escribir
 (reutiliza la misma `applyCoupon()`, ya migrada a la RPC `validate_coupon_code` de P1-6). "Borrar"
@@ -632,7 +632,7 @@ instante; un código inexistente muestra "Código inválido o expirado." sin rom
 de consola en todo el flujo.
 
 ## P0-6: Split payments con Mercado Pago Marketplace, modo piloto (2026-07-15)
-Del backlog de mejoras post-lanzamiento (`docs/BACKLOG_MEJORAS.md`). Antes, `mp-create-preference`
+Del backlog de mejoras post-lanzamiento. Antes, `mp-create-preference`
 cobraba TODO con la cuenta de MP de la propia plataforma (`MP_ACCESS_TOKEN` global) — ningún
 vendedor recibía la plata directo. Decisiones del usuario: split automático vía OAuth (no
 conciliación manual), comisión de la plataforma arranca en **0%** y se sube de a poco con el
@@ -683,7 +683,7 @@ andando); se resuelve el caso multi-tienda encadenando pagos más adelante, no e
   `VITE_MP_CLIENT_ID` (público) en `.env`/Vercel; activar el piloto a mano por SQL para 1-2 tiendas
   de prueba (`update public.stores set mp_split_pilot = true where id = '<store_id>'`); probar con
   las credenciales de prueba de Mercado Pago (vendedor comprador de prueba, no plata real) antes de
-  confiar en el flujo. Detalle completo en `docs/BACKLOG_MEJORAS.md` (P0-6).
+  confiar en el flujo.
 
 ### P0-6 — sesión de testing end-to-end (2026-07-15, continuación)
 
@@ -747,8 +747,7 @@ algún estado de verificación/aprobación pendiente en la cuenta del vendedor c
 con el `preference_id` generado.
 
 Nota operativa: en paralelo a este testing se lanzó un subagente para resolver ítems P2 del
-backlog (P2-1, P2-6, P2-8) — ver commit local `d6e9a96` (sin push), documentado en
-`docs/BACKLOG_MEJORAS.md`.
+backlog (P2-1, P2-6, P2-8) — ver commit local `d6e9a96` (sin push).
 
 ### P0-6 — dos regresiones reales encontradas y arregladas (2026-07-16)
 
@@ -1123,3 +1122,522 @@ markup interno todavía). Sin migración en ninguno de los 3 commits — 100% fr
 - ✅ **BUG F0-03 (resuelto):** `validate_cart_prices` leía `products.name`/`products.price` (inexistentes) → fallaba en runtime. Recreada con `title`/`price` en migración 12; columnas migradas de centavos a pesos.
 - Funciones en la DB: `approve_seller_request`, `handle_new_user`, `prevent_role_update_on_profile` (protección de rol activa), `rls_auto_enable`, `set_updated_at`, `update_user_carts_modtime`, `validate_cart_prices`.
 - `seller_requests` tiene columnas extra (`cuit`, `address`, `category_slug`, `phone`) → migración 05 aplicada.
+
+## Rediseño de "Información de tu perfil" (2026-08-28)
+
+Rama `mi-perfil-info-personal`. Pedido del usuario: rediseñar ese apartado con "todos los
+apartados de una página seria, no solo correo nombre y apellido", con diseño orgánico "que no
+parezca IA".
+
+**De qué se partía:** el panel `tab-mis-datos` eran dos `.perfil-card` con tres datos de sólo
+lectura (nombre, email, rol) y una frase de relleno sobre los beneficios de comprar local. No
+había forma de completar ni corregir ningún dato propio desde la app — el teléfono solo se podía
+cargar adentro de una dirección, y el nombre solo llegaba desde Google.
+
+**Migración 61 (`61_profile_personal_data.sql`, aplicada y verificada en la base real):**
+- `profiles.birth_date` (date), `doc_type` (text), `doc_number` (text).
+- CHECKs: `doc_type` en {DNI, LC, LE, CI, Pasaporte}; tipo y número van juntos o ninguno
+  (`(doc_type is null) = (doc_number is null)` — un número suelto no identifica a nadie);
+  `birth_date` ni futura ni de hace más de 120 años (ataja el dedazo 1902/2002).
+- Bucket **`avatars`** nuevo (público, porque la foto se ve en reseñas y navbar) con policies de
+  escritura restringidas a la carpeta `{uid}/` — antes solo se podía tener foto entrando con
+  Google; quien se registró con email no tenía manera de ponerse una.
+- `full_name` se dejó como un solo campo **a propósito**: partirlo en nombre/apellido obligaba a
+  migrar datos y tocar navbar, órdenes, reseñas y panel de vendedor para ganar muy poco.
+
+**Estructura nueva** (`pages/perfil.html`): intro + aviso de perfil incompleto con barra de
+progreso + grupos "Tu foto", "Datos personales", "Contacto", "Seguridad", "Tu cuenta" y, separado
+por una línea al final, "Tus datos son tuyos" (descargar mis datos / eliminar mi cuenta,
+Ley 25.326).
+
+**Decisiones de diseño (el pedido de "que no parezca IA"):**
+- **Filas con divisores, no una grilla de tarjetas.** Cada dato es una fila con su acción
+  discreta a la derecha, como la pantalla de datos de Mercado Libre / Amazon / ajustes de iOS.
+  Una grilla de cajas iguales es justo lo que delata una UI generada.
+- **Deliberadamente NO se reusa `.perfil-card`.** Esa clase tiene hover-lift, que está bien para
+  algo en lo que hacés click entero (las tarjetas del hub) pero mal para una lista donde cada
+  fila tiene su propio botón: si el contenedor se mueve, el botón se te escapa del cursor.
+- **Títulos de grupo sin ícono**, en gris chico afuera del panel. Los íconos quedan en el hub;
+  así el hub y el detalle no compiten.
+- **Edición fila por fila** (progressive disclosure), una sola abierta a la vez: abrir un
+  formulario de seis campos para corregir el teléfono es pedirle al usuario que revise todo para
+  tocar uno. Enter guarda, Escape cancela.
+- **Un solo botón primario visible a la vez** (el "Guardar" de la fila abierta).
+- Copy rioplatense y concreto ("Para que el comercio o el repartidor te avisen si hay una
+  demora"), no genérico tipo "Gestioná la configuración de tu cuenta".
+
+**Verificación** (medida en el navegador, no a ojo): los 10 botones dan exactamente 44px de alto;
+inputs en 16px (evita el zoom automático de iOS) y 44px de alto; sin scroll horizontal ni en
+1265px ni en 375px; en móvil las filas pasan a columna y la acción baja debajo del dato. Contraste
+WCAG AA en todos los estados de color: aviso 7.11, ícono del aviso 4.83, tag "Verificado" 5.21,
+título de grupo 5.31, botón primario 9.98, botón "Editar" 9.98, botón de peligro 6.04. El texto de
+ayuda usa un gris propio (`--bl-perfil-hint`, ~5.7:1) porque `--bl-perfil-text-sec` llega solo a
+~3.5:1 y no pasaba AA para texto que hay que leer.
+
+**Gotchas resueltos:**
+- `formatBirthDate` parsea el string a mano en vez de `new Date('1994-03-12')`: eso último es UTC
+  y en Argentina (UTC-3) mostraba **el día anterior**. Hay test para esto.
+- `syncProfileHeader()` NO repinta el avatar: hacerlo con `profileData.avatar_url` borraba la foto
+  de Google, que no vive en esa columna.
+- La barra de "perfil completo" cuenta la foto de Google como foto puesta (vía
+  `displayedAvatarUrl`), si no mostraba una foto y a la vez "te falta una foto".
+- El botón "Quitar" de la foto solo aparece si la foto es una que subimos nosotros — la de Google
+  se ve igual pero no es nuestra para borrar.
+- `deleteStoredAvatar()` borra el objeto anterior del bucket al reemplazar o quitar la foto, así
+  este bucket no arrastra el problema de **fotos huérfanas** que sí tiene el de productos. Sirve
+  de modelo para cuando se arregle aquel.
+
+**Baja de cuenta:** borrar de verdad el usuario de `auth.users` necesita la service role key, que
+no puede vivir en el navegador (haría falta una Edge Function). Se reusa `submitSupportTicket()`
+para abrir un pedido que procesa un admin — mismo canal que ya usa el resto de la app, sin inventar
+uno nuevo. **Ojo:** hoy nadie tiene rol admin en producción, así que esos tickets no los está
+mirando nadie todavía.
+
+**Descargar mis datos** sí es completo y client-side: junta perfil, direcciones, pedidos (con
+items), favoritos y reseñas — todo sale filtrado por RLS, así que cada consulta devuelve solo lo
+del propio usuario — y lo baja como JSON.
+
+**`js/profile-fields.js` (archivo nuevo):** los 4 campos editables se declaran una sola vez
+(display / inputs / collect / validate) y un único renderer arma tanto la fila de lectura como la
+de edición. Escribir las cuatro filas a mano era el mismo bloque copiado cuatro veces, con cuatro
+lugares donde olvidarse el `aria-label`. No toca DOM ni Supabase a propósito: eso permite correr
+`node js/profile-fields.test.mjs` (16 chequeos con `node:assert`, sin framework — el proyecto
+sigue sin runner de tests, F10-02 diferido) sobre lo que se rompe en silencio: el desfase de zona
+horaria y los regex de documento y teléfono.
+
+**Limpieza:** se borraron `.detail-list`, `.detail-item`, `.detail-value` y `.level-badge` de
+`perfil-custom.css` — esta pantalla era la única que las usaba. Sobrevive `.detail-label`, que
+todavía usa el formulario de direcciones.
+
+## Fotos huérfanas de Storage + baja de cuenta real (2026-08-28)
+
+Rama `ajustes-perfil-pendientes`. El usuario pidió tres cosas: sacar la descripción de "fecha de
+nacimiento" y arreglar los dos pendientes que habían quedado del rediseño del perfil.
+
+### 1. Descripción de "fecha de nacimiento"
+Decía "Algunos comercios la necesitan para venderte productos con restricción de edad". Se sacó
+porque la venta de alcohol todavía no está definida (queda para más adelante). `hint` pasó a ser
+**opcional** en el renderer de filas — hay guardas en `buildDisplayRow` y en `openRowEditor`, si no
+el `textContent` quedaba literalmente en `"undefined"`.
+
+### 2. Fotos huérfanas del bucket `products` (pendiente que venía de 2026-08-14)
+
+Había **dos** caminos que dejaban archivos sueltos, no uno: quitar una foto editando el producto, y
+eliminar el producto entero (nunca se tocaba el storage).
+
+**Gotcha importante:** la solución "obvia" era listar la carpeta `{productId}/` y borrar lo que
+sobra. **No funciona:** el bucket `products` no tiene policy de SELECT sobre `storage.objects` (se
+verificó en `pg_policies` — solo tiene INSERT, UPDATE y DELETE), así que `list()` devuelve vacío
+**sin error**. Habría quedado un fix que no hace nada y parece que sí. Por eso se rastrean las URLs
+explícitamente: `savedImageUrlsAtLoad` guarda las fotos que el producto tenía al abrir el
+formulario, y al guardar se borra la diferencia contra las que quedaron. Para el borrado del
+producto, las URLs se leen **antes** del delete (después `product_images` ya se fue en cascada).
+
+El parseo URL pública → ruta se extrajo a **`js/storage-utils.js`** porque `perfil.js` ya hacía lo
+mismo para los avatares (era duplicación). No importa nada, ni el cliente de Supabase (se recibe
+por parámetro), así que corre con `node js/storage-utils.test.mjs` — 11 chequeos. Vale la pena
+testearlo aunque sea corto: es lo que decide **qué archivo se borra**. Cubre que ignore URLs de
+otro bucket y externas (la foto de Google), que corte query y fragmento, que decodifique el
+porcentaje, que rechace `..`, que no llame a la API si no quedó nada y que un error del storage no
+rompa la operación.
+
+Solo se borra lo que se desreferencia de ahora en más. **Las fotos huérfanas anteriores siguen
+ahí** — para limpiarlas haría falta una pasada puntual con service role.
+
+### 3. Baja de cuenta de verdad
+
+Se escribió `supabase/functions/delete-account/index.ts`, que borra la cuenta con la service role
+key en vez de dejar un ticket que un admin procese a mano.
+
+Antes de escribirla se auditaron los FK contra `auth.users` y `stores`, y ahí apareció lo que
+decidió el diseño:
+- `orders.client_id` → **SET NULL**: el pedido sobrevive anonimizado, el comercio conserva su
+  historial de ventas. `order_items.product_id` y `orders.store_id` también son SET NULL, y
+  `order_items` ya guarda `title`/`price` congelados — o sea, el recibo no se rompe.
+- `stores.owner_id` → **CASCADE**: borrar a un vendedor **se lleva la tienda entera** (productos,
+  cupones, conversaciones, credenciales de MP). Por eso la función **bloquea** la baja si la
+  persona tiene un comercio y la deriva a soporte. Segunda guarda: pedidos en `paid`/`shipped`/
+  `ready_for_pickup` (no se bloquea por `pending`, que suele ser un carrito abandonado y dejaría la
+  cuenta trabada para siempre).
+
+Seguridad: el uid a borrar sale **siempre** del JWT del llamador, nunca del body — no hay forma de
+pedir la baja de otra persona. `verify_jwt: true`.
+
+**Desplegada** (v1, `verify_jwt: true`). El primer intento lo bloqueó el clasificador de permisos
+de la sesión; no se buscó una vía alternativa a propósito, se le avisó al usuario y él autorizó el
+despliegue explícitamente. Verificado contra la función viva: POST sin header → 401
+`UNAUTHORIZED_NO_AUTH_HEADER`, POST con JWT inválido → 401 `UNAUTHORIZED_INVALID_JWT_FORMAT`,
+OPTIONS → 200 `ok` (esto último prueba que el código propio corre, porque el preflight no pasa por
+verify_jwt).
+
+**El camino feliz quedó sin probar**: ejecutarlo borra una cuenta real y es irreversible. Probarlo
+con una cuenta de descarte antes de confiar en él.
+
+El front igual mantiene el respaldo: si recibiera 404 cae al pedido manual por ticket
+(`requestDeletionByTicket`), así el botón nunca queda roto. Un 409 muestra el motivo real tal cual
+("tenés un comercio activo…"): `functions.invoke` **no** parsea el cuerpo del error, lo deja crudo
+en `error.context` — de ahí el helper `readFunctionError`, sin el cual el motivo se perdía y todo
+se veía como un error genérico.
+
+## Prueba real de `delete-account` → apareció un bug de esquema (2026-08-28)
+
+Rama `fix-orders-nullable`. El usuario pidió probar la baja de cuenta con una cuenta de descarte.
+La prueba valió la pena: **el camino feliz estaba roto** y las verificaciones anteriores (401 sin
+sesión, 200 en el preflight) no lo tocaban.
+
+### El bug
+
+`orders.client_id` y `orders.store_id` estaban declaradas `ON DELETE SET NULL` —alguien eligió a
+propósito que el pedido sobreviva al usuario y a la tienda, para que el comercio conserve su
+historial— **pero las dos columnas eran `NOT NULL`**. La cascada intentaba escribir NULL, el
+constraint lo rechazaba, y el DELETE del padre fallaba entero:
+
+```
+null value in column "client_id" of relation "orders" violates not-null constraint
+```
+
+Consecuencia: **no se podía borrar una cuenta que tuviera aunque sea un pedido** (de cualquier
+estado, incluso `completed`), ni **una tienda con pedidos**. La función devolvía 500.
+
+El dato estaba a la vista antes de escribir la función (una consulta de columnas NOT NULL había
+listado `orders.client_id`) y no se cruzó con la regla SET NULL del FK. Sin probar de verdad,
+llegaba a un usuario real.
+
+**Consulta que caza esta clase de bug** (no solo este caso) — debe dar 0 filas:
+```sql
+select con.conrelid::regclass, att.attname
+from pg_constraint con
+join unnest(con.conkey) with ordinality k(attnum, ord) on true
+join pg_attribute att on att.attrelid = con.conrelid and att.attnum = k.attnum
+where con.contype='f' and con.confdeltype='n' and att.attnotnull;
+```
+
+Arreglo: migración `62_orders_nullable_on_delete.sql` (quita el NOT NULL de las dos columnas,
+alineándolas con la intención ya declarada en el FK; no se toca el FK). Verificado antes de
+aplicar que la app lo tolera: la RLS `orders_select_own` compara `client_id = auth.uid()` y con
+NULL da falso (el pedido anonimizado deja de verse del lado cliente, que es lo buscado);
+`vender.js` ya hacía `.filter(Boolean)` sobre client_id y leía el teléfono con `|| ''`; `perfil.js`
+usa `order.stores?.name || 'Comercio'`.
+
+### Cómo se probó (sirve de receta si hay que repetirlo)
+
+El alta por la API pública **no sirve**: la validación de email rechaza `.invalid` y `example.com`
+("email_address_invalid"), el alta manda mail de confirmación (o sea que no devuelve sesión) y a
+los pocos intentos corta con 429 `over_email_send_rate_limit`.
+
+Lo que funcionó fue crear el usuario directo en `auth.users` por SQL con `crypt(pw, gen_salt('bf'))`
+y `email_confirmed_at = now()`, más su fila en `auth.identities`. **Gotcha:** hay que poner los
+campos de token (`confirmation_token`, `recovery_token`, `email_change`, `email_change_token_new`,
+`email_change_token_current`, `phone_change`, `phone_change_token`, `reauthentication_token`) en
+`''`, no en NULL — si quedan NULL, el login falla con 500 *"Database error querying schema"*.
+Después se saca el JWT con `grant_type=password` contra `/auth/v1/token`.
+
+### Resultado final (cuenta de descarte nº2, ya borrada)
+
+| Escenario | Resultado |
+|---|---|
+| Con comercio a su nombre | 409 `tiene_tienda`, nombre del comercio en el mensaje |
+| Con pedido `paid` | 409 `pedidos_abiertos`, singular bien conjugado |
+| Con pedido `completed` | **200 `{"ok":true}"`** |
+
+Tras el 200: usuario, perfil, identidad, direcciones y favoritos en 0; el pedido **sigue
+existiendo** con `client_id` en NULL, `store_id` intacto y `total_price` sin tocar. O sea, el
+comercio conserva la venta y la persona desaparece — que es exactamente lo que se buscaba.
+
+Las dos cuentas de descarte y sus datos quedaron borrados; se verificó que no quedaran usuarios
+`%@baradero-local.test`, tiendas de prueba ni pedidos huérfanos.
+
+## Selector de comprobante personalizado (2026-08-28)
+
+Rama `selector-comprobante`. El usuario pidió sacar el `<input type="file">` nativo (el
+"Seleccionar archivo / Ningún archivo seleccionado" del navegador) de la tarjeta de pedido y
+reemplazarlo por uno con el estilo del sitio.
+
+**Era el único input de archivo pelado que quedaba**: se buscaron todos y los otros dos (avatar en
+`perfil.html`, fotos de producto en `vender.html`) ya estaban `hidden` con disparador propio. O sea
+que era un caso aislado de verdad, no la punta de un patrón repetido.
+
+Se reusó el lenguaje visual del dropzone del alta de producto (`.pubform__drop`: borde punteado +
+ícono + `role="button"`), pero **compacto**: acá vive adentro de la tarjeta de un pedido, no en un
+formulario entero, así que es una fila de 60px en vez de un bloque de 1.75rem de padding.
+
+`buildProofPicker()` en `js/perfil.js` devuelve `{ element, getFile, onChange }`. Dos estados: zona
+de arrastre, y "chip" con el archivo elegido (ícono, nombre recortado con ellipsis, peso formateado
+y botón de quitar). Lo único que el input nativo aportaba —mostrar qué archivo elegiste— se
+conserva; el resto se gana.
+
+De paso:
+- **Se agregó tope de 10 MB**, que no existía: antes se podía mandar un archivo de cualquier tamaño
+  y fallaba recién en el storage, con un mensaje incomprensible.
+- El botón "Subir comprobante" arranca **deshabilitado** hasta que haya archivo, en vez de ser
+  apretable para contestar con un toast de reproche ("Elegí un archivo primero").
+- Accesibilidad: `role="button"` + `tabIndex=0` + Enter/Espacio (un div con role=button no responde
+  solo a esas teclas), `aria-label` en la zona y en el botón de quitar, y el error con `role="alert"`.
+
+**Arreglo adyacente:** `.compra-item` era una fila flex sin regla para pantallas chicas, así que en
+un teléfono la info quedaba apretada en ~190px (el detalle del pedido partido en dos líneas, el
+selector nuevo ilegible) y el precio flotando al costado. Se agregó el apilado en `max-width: 600px`.
+El input nativo sufría lo mismo, no lo causó este cambio.
+
+**Gotcha de verificación:** medir con el panel del navegador oculto da basura —`window.innerWidth`
+devuelve 0 y todos los `getBoundingClientRect()` colapsan (la zona "medía" 124px de alto y el
+contenedor 151px). Hay que forzar un viewport con `resize_window` antes de medir o de sacar
+capturas; con 1100x900 los números dieron bien (zona de 60px, botón de 44px).
+
+## Buscador propio + filtro por categoría en Favoritos (2026-08-28)
+
+Rama `favoritos-filtro-categoria`. El usuario pidió sacar el buscador nativo de "Mis favoritos" y
+sumar filtrado por categoría de producto. (De paso confirmó que el apilado en móvil de
+`.compra-item` del cambio anterior queda como está.)
+
+**Por qué se veía pelado:** el input era `<input class="form-input">`, pero **`.form-input` solo
+existe inline en `vender.html` y `repartidor.html`** — `perfil.html` carga `home.css`,
+`carrito.css` y `perfil-custom.css`, ninguna la define. O sea que la clase no aplicaba nada y se
+veía el input crudo del navegador. Era el único caso en la página (el formulario de direcciones usa
+`.bl-input`, que sí está definida ahí).
+
+Ahora es un campo tipo píldora con lupa a la izquierda y botón de limpiar a la derecha, que aparece
+solo cuando hay texto. Se oculta la "x" nativa de `type=search`
+(`::-webkit-search-cancel-button { display: none }`) porque cada navegador la dibuja distinto y no
+es un objetivo táctil de verdad; la propia mide 36px. Escape también limpia.
+
+**Filtro por categoría** (`renderFavCategoryChips`): chips con la categoría y el conteo, armados
+con las categorías que el usuario **realmente tiene** en favoritos, no las 14 del sitio — ofrecer
+"Panadería" a alguien sin nada de panadería es mandarlo a un filtro vacío. Ordenados por cantidad
+descendente. Decisiones:
+- Se ocultan si hay **menos de 2** categorías: con una sola no filtran nada.
+- Se ocultan en la pestaña **Comercios**: el filtro es de categoría de producto (lo pedido).
+- Los productos sin `category_id` se agrupan en un chip **"Sin categoría"**.
+- Volver a tocar la categoría activa la desactiva.
+- El texto y la categoría se combinan (AND).
+- El mensaje de vacío distingue "no tenés nada" de "tu filtro no dio nada" — decirle "todavía no
+  agregaste favoritos" a alguien que sí tiene pero filtrados es mentirle.
+
+El dato sale de `products.category_id` → `categories(name)`, embebido en la query que ya existía
+(`categories_select_public` tiene `qual: true`, así que el join no vuelve vacío por RLS).
+
+**Gotcha que se corrigió sobre la marcha:** la rama de "menos de 2 categorías" reseteaba
+`favCategory` a 'todas' sin volver a aplicar el filtro. Como `renderFavCategoryChips` corre **al
+final** de `applyFavFilter`, eso dejaba la grilla mostrando un recorte y los chips diciendo otra
+cosa. Se sacó el reseteo (es inalcanzable hoy, pero era una trampa para el próximo que toque esto).
+
+**Verificado** con los 9 escenarios combinados: filtro por categoría (3 de 7), categoría + texto
+(1), cruce vacío con el mensaje correcto, limpiar la búsqueda conservando la categoría, toggle de
+la categoría activa, "Sin categoría", y los chips ocultándose al pasar a Comercios y volviendo al
+volver. En móvil: 375px sin scroll horizontal, input de 44px con fuente de 16px, chips de 36px
+envolviendo en 3 filas. Contraste ≥9.98 en chips activos e inactivos.
+
+**Gotcha de medición (otra vez):** capturar una referencia a un `.fav-chip` **antes** de disparar
+un filtrado da medidas en 0 — `applyFavFilter` reconstruye los chips y el nodo viejo queda
+desconectado del DOM. Hay que volver a consultarlo después del re-render.
+
+## Selector de categoría del alta de producto (2026-08-28)
+
+Rama `categoria-alta-producto`. Se sacó el `<select id="prod-category">` nativo.
+
+**Decisión: radios nativos estilados, no botones + input oculto.** Son 14 categorías con ícono, así
+que una grilla que las muestra todas es más rápida que desplegar una lista. Y usando
+`<input type="radio">` de verdad, la plataforma sigue dando gratis: navegación con flechas dentro
+del grupo, `required`, `form.reset()` y el anuncio "opción 3 de 14" del lector de pantalla. La
+alternativa (botones + un select escondido como fuente de verdad) hubiera obligado a reimplementar
+todo eso a mano.
+
+**Gotcha central:** el radio se oculta con `position:absolute; opacity:0`, **nunca `display:none`**.
+Con `display:none` sale del orden de tabulación y el navegador no puede enfocarlo para mostrar el
+aviso de campo obligatorio — el envío quedaría bloqueado sin que el usuario vea por qué. Verificado
+que con esta técnica `checkValidity()` da false y el mensaje nativo es "Selecciona una de estas
+opciones".
+
+Estado elegido: borde + fondo tenue + negrita **+ tilde**, para no depender solo del color.
+Selección y foco se resuelven con `:has()` en CSS, sin JS.
+
+**De paso se sacó un acoplamiento:** `prod-category` se armaba copiando el `innerHTML` del select
+de rubros del alta de comercio (`categorySelect.innerHTML = placeholder + baseCategorySelect.innerHTML`).
+Eso ataba un control al otro y dependía de cuál se inicializara primero — si el formulario de
+producto se armaba antes de que resolviera el fetch de `loadCategories()`, quedaba solo con el
+placeholder. Ahora los dos salen de `categoriesCache` y `loadCategories()` re-dibuja la grilla al
+terminar, así que el orden deja de importar.
+
+Tres puntos de lectura migrados: `setProductCategorySlug()` al editar (antes `.value = slug`),
+`getProductCategorySlug()` en el submit (antes `.value`), y el armado. El `icon` de la tabla
+`categories` se acota con un regex a caracteres de clase CSS antes de meterlo en `className`.
+
+**Móvil:** el mínimo de la grilla es 130px, no 150px. Es el valor más chico que entra dos veces en
+un teléfono de 375px sin cortar "Carnicería" (se midió `scrollWidth > clientWidth` con cada valor):
+2 columnas y 356px de alto, contra 14 filas y ~730px con una sola columna. En desktop quedan 5
+columnas. Una línea en vez de un media query.
+
+**Verificado:** 14 opciones, sin categoría el form es inválido con el mensaje nativo y el radio es
+enfocable, con categoría es válido y el submit lee el slug correcto, `form.reset()` desmarca, el
+re-dibujado conserva la elegida, y en 375px no hay scroll horizontal con opciones de 44px.
+
+## Rubros con checkbox + comercios en los resultados de búsqueda (2026-08-28)
+
+Rama `rubros-y-comercios-en-busqueda`. Dos pedidos del usuario.
+
+### 1. Select de rubros del alta de comercio
+
+Era `<select multiple required>` con la ayuda "Mantené Ctrl (o Cmd en Mac) para elegir más de uno"
+— un patrón que además **no existe en un teléfono**. Pasa a grilla de checkbox, reusando las clases
+`.catpick` del selector de categoría de producto (creadas el mismo día): el marcado es idéntico,
+solo cambia `type`. Se generalizó a `renderCategoryPicker(gridId, { name, type, required })` en vez
+de duplicar los ~30 líneas.
+
+**Gotcha:** los checkbox **no** llevan `required`. En un grupo de checkbox el `required` es por
+casilla, o sea que obligaría a marcarlas **todas**. El mínimo de un rubro lo valida el submit, que
+ya lo hacía (`categoriesInput.length === 0` → showToast).
+
+De paso, `loadCategories()` ya no deja un "Cargando rubros..." eterno si el fetch falla: escribe un
+mensaje de error en las dos grillas.
+
+### 2. Tarjeta de comercio en los resultados de búsqueda
+
+`buildStoreCard` **ya existía** en `comercios.js` y hacía exactamente lo pedido (una
+`<a class="product-card">` que va a `comercio.html?id=`). Se movió a `cart-utils.js` —el módulo de
+UI compartida, donde ya viven `buildPriceRow`/`renderErrorState`— y ahora la usan las dos páginas,
+en vez de duplicarla.
+
+Los comercios se traen una sola vez y se filtran en memoria (son 14): así el filtro puede **ignorar
+acentos** con `normalize('NFD')`, cosa que un `ilike` del servidor no hace — buscar "carniceria"
+encuentra "Carnicería El Novillo". Hay un `ponytail:` marcando el techo (si algún día son miles, un
+RPC con unaccent). Solo se muestran con texto escrito: filtrar comercios por precio o por categoría
+de producto no tiene sentido.
+
+Si no hay productos pero **sí** un comercio, el estado vacío ya no dice "Sin resultados" —sería
+mentira, hubo resultado, solo que no es un producto— sino "No encontramos productos para X, pero sí
+el comercio de arriba".
+
+**BUG ENCONTRADO AL PROBAR (importante):** la tarjeta no navegaba. `initProductModal()` en
+`product-modal.js` engancha un listener a cada `.products__grid` y hace `preventDefault()` +
+`openProductModal()` sobre cualquier `.product-card` — y la tarjeta de comercio reusa esa clase.
+En `comercios.html` nunca se notó porque esa página no carga `product-modal.js`. Arreglo de causa
+raíz: el listener ahora ignora los clicks que caen dentro de un `a[href]`, porque un enlace tiene
+que navegar. Es seguro: **todas** las tarjetas de producto son `<article>` (home.js, search.js,
+comercio.js), solo la de comercio es `<a>`. Verificado que el modal de producto sigue abriendo.
+
+**Gotcha de verificación:** los clicks por coordenada fallaban porque la captura viene **escalada**
+(799px de ancho para un viewport de 1200px) y `computer left_click` usa coordenadas de la captura,
+no de la página. Los clicks por `ref_N` (de `find`) no tienen ese problema — usar esos.
+
+**Verificado contra la base real** (la búsqueda es pública, no hizo falta sesión): buscar
+"carniceria" sin tilde muestra la sección "Comercio (1)" con Carnicería El Novillo arriba de los
+productos, y al hacerle click lleva a `comercio.html?id=03738e21…` con su ficha cargada. Los rubros
+se probaron en previsualización: 14 checkbox, selección múltiple, desmarcado, el submit lee los
+slugs, el re-dibujado conserva lo marcado y sin ninguno el form es válido a nivel navegador (lo
+ataja el submit).
+
+## "Ordenar por" sin select nativo (2026-08-28)
+
+Rama `orden-sin-select`. Último `<select>` que quedaba en la página de búsqueda.
+
+**No se inventó un control nuevo:** justo al lado, en el mismo sidebar, ya existía el desplegable
+propio de Categoría (`.cat-filter-dropdown`: trigger + menú `role="listbox"`). El de orden reusa ese
+marcado y esos estilos, así que los dos filtros se ven y se comportan igual.
+
+Para no tener la mecánica copiada dos veces (abrir, cerrar al click afuera, cerrar con Escape,
+marcar la activa eran ~40 líneas dentro de `renderCategoryPills`), se extrajo
+`initFilterDropdown({ rootId, triggerId, menuId, labelId, options, getValue, onSelect })`, que
+devuelve `{ sync, close, setOptions }`. El de categoría usa `setOptions()` porque sus opciones
+llegan de la DB después; el de orden las tiene fijas en `SORT_OPTIONS`.
+
+De paso, al unificar:
+- Las opciones ahora llevan **`aria-selected`**. Tenían `role="option"` sin él, que para un lector
+  de pantalla no dice cuál está elegida.
+- `syncPills()` pasó de manipular el DOM a mano a delegar en los dos desplegables.
+- `clearAllFilters()` ya no necesita tocar el select por id.
+- Se borraron `.filter-select` y `.filter-select-wrapper` de `home.css`: envolvían a ese select y
+  ninguna otra página las usaba.
+
+**Arreglo adyacente (accesibilidad):** el trigger daba 38px de alto y las opciones 33px, por debajo
+del mínimo táctil de 44px. Como es CSS compartido, se corrigieron **los dos** desplegables (el de
+orden y el de categoría, que ya estaba así de antes). También se les agregó anillo de foco visible.
+
+**Verificado contra la base real** (la búsqueda es pública): 0 `<select>` en la página; el
+desplegable de orden abre, lista las 5 opciones, marca la activa con `aria-selected="true"`, cierra
+al elegir y escribe `?sort=precio-desc` en la URL; el orden **realmente reordena** (65000 → 55000 →
+42000 → 35000). El de categoría sigue intacto tras el refactor: 15 opciones, filtra a "Bebidas",
+combina con el orden en la URL, y cierra con Escape y con click afuera. En 375px los dos dan 44px
+de trigger y de opción, sin scroll horizontal.
+
+**Gotcha:** en móvil el sidebar está oculto detrás del botón "Filtros", así que medir sin abrirlo
+primero da 0 en todo (`getBoundingClientRect` sobre un ancestro con `display:none`).
+
+## Vehículo del alta de repartidor sin select (2026-08-28)
+
+Rama `vehiculo-sin-select`. Tres opciones (bicicleta/moto/auto), así que radios estilados con
+íconos, mismo patrón que las otras dos altas.
+
+**Los estilos `.catpick` se movieron de inline en `vender.html` a `home.css`.** Los usan ya tres
+formularios (categoría de producto, rubros de comercio, vehículo de repartidor) y las tres páginas
+cargan `home.css`; tenerlos duplicados en cada `<style>` inline era pedir que se desincronizaran.
+
+**Cómo convive con el acento del panel vendedor:** `.catpick` define
+`--catpick-accent: var(--bl-vendor-accent, var(--bl-primary))` y su par `-rgb`. En `vender.html`,
+que declara `--bl-vendor-accent` en su `:root`, la grilla sigue saliendo con el azul del panel
+(#2f5aa8); en `repartidor.html`, que no lo declara, cae al azul de marca (#284175). Verificado en
+las dos configuraciones.
+
+**Cambio de comportamiento a propósito:** el `<select>` arrancaba en "bicicleta" (primera opción),
+así que el campo "Patente" nacía oculto y el usuario podía enviar sin elegir vehículo nunca,
+quedando como ciclista por omisión. Con radios no hay nada preseleccionado: "Patente" aparece
+**solo** al elegir moto o auto, y el `required` obliga a elegir. `getVehicleType()` devuelve `''`
+si no hay nada marcado, y la condición de la patente es `tipo && tipo !== 'bicicleta'` — sin ese
+`tipo &&`, con nada elegido `'' !== 'bicicleta'` daba true y la patente aparecía de entrada.
+
+**Verificado** (el formulario pide sesión, así que se probó en previsualización cargando las hojas
+reales `home.css` + `auth.css`): 0 selects, 3 opciones de 44px, la patente oculta al inicio y con
+bicicleta, visible con moto y auto, y oculta otra vez al volver a bicicleta; sin vehículo el form
+es inválido con el mensaje nativo y el radio es enfocable.
+
+**Gotcha de medición (nuevo):** `getComputedStyle` devuelve valores **obsoletos** para propiedades
+que dependen de `:has()` **en el elemento sujeto** (el borde y el fondo de la opción marcada
+seguían leyéndose como los de reposo), aunque las reglas de sus **descendientes** sí se leían bien
+(el ícono). Lo que se pinta está correcto — se confirmó por captura. O sea: para estados con
+`:has()`, creerle a la captura, no a `getComputedStyle`.
+
+También: `requestAnimationFrame` **no dispara** con el panel del navegador oculto (no hay
+composición) y cuelga el script hasta el timeout; usar `setTimeout` para esperar un recálculo.
+
+**Estado de los selects nativos:** quedan dos, los dos fuera de lo pedido hasta ahora —
+`delivery-address-select` (elegir dirección en el carrito) y `role-switcher` (cambiar de rol en el
+perfil, solo visible para admin/moderador).
+
+## Dirección del carrito sin select (2026-08-28)
+
+Rama `direccion-sin-select`. Distinto de los anteriores: las opciones son **dinámicas** (las
+direcciones guardadas del usuario, 0..N) más una de "usar otra".
+
+**No se usó `.catpick`** (la grilla de las altas) sino una lista propia `.addr-option` con el
+**radio visible**: acá conviven a dos centímetros de los radios de retiro/envío, y tenían que
+leerse como el mismo tipo de elección. Cada opción muestra la etiqueta ("Casa"), la dirección
+completa y el tag "Predeterminada" si corresponde.
+
+**El motivo real del cambio, más allá de la estética:** una dirección es un texto largo
+("Avenida Presidente Juan Domingo Perón 4587 esquina Los Aromos") y el `<select>` la recortaba en
+una sola línea. Ahora envuelve (`overflow-wrap: anywhere`) y se lee entera — verificado que no
+desborda en 375px.
+
+**Bug de orden asíncrono arreglado de paso:** `loadAddressSelector()` es async y
+`initDeliveryEvents()` decide qué mostrar según si hay direcciones. Con el `<select>` el chequeo era
+`options.length > 2` sobre un elemento que se poblaba en el lugar; con la lista nueva pasó a ser
+`savedAddresses.length`, una variable que empieza vacía. Si el usuario elegía "envío" antes de que
+resolviera el fetch, veía el campo libre y **sus direcciones guardadas nunca aparecían**. Se agregó
+`refreshDeliveryUI` (referencia a `updateMethod` que expone `initDeliveryEvents`), que
+`loadAddressSelector` llama al terminar. Verificado ese caso puntual.
+
+El listener va **delegado** en el contenedor, no en cada radio: las opciones se inyectan después,
+así que engancharse a cada una en `initDeliveryEvents` llegaría antes de que existan.
+
+**Adyacente:** los radios de retiro/envío salían con el violeta por defecto del navegador, que no
+es de la paleta y desentonaba con las opciones de dirección de abajo. Se les puso
+`accent-color: var(--bl-primary)`.
+
+**Verificado** en previsualización con las hojas reales (el carrito necesita sesión para traer las
+direcciones), 6 escenarios: sin direcciones cargadas todavía → campo libre; al llegar → lista
+visible con la predeterminada ya elegida y puesta en `shippingAddress`; elegir otra → se actualiza;
+"usar otra dirección" → aparece el campo libre, se limpia y toma el foco; volver a retiro → se
+esconde todo; volver a envío → la lista vuelve conservando el estado. En 375px: sin scroll
+horizontal, opciones de 68px, texto largo envuelto.
+
+**Estado de los selects nativos:** queda **uno solo** en todo el proyecto, `role-switcher` en
+`perfil.html` (cambiar de rol, visible únicamente para admin/moderador).

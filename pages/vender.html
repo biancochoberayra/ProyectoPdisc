@@ -411,6 +411,9 @@
       .pubform__drop i { font-size: 1.6rem; color: var(--bl-vendor-accent); }
       .pubform__drop-main { font-weight: 600; color: var(--bl-text); }
 
+      /* Los estilos de .catpick viven en home.css: los comparten el alta de
+         producto, el alta de comercio y el alta de repartidor. */
+
       .pubform__gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
       .pubform__gallery:empty { display: none; }
       .pubform__photo { position: relative; border: 1px solid var(--bl-border); border-radius: var(--bl-radius-md); overflow: hidden; background: var(--bl-surface-alt); cursor: grab; }
@@ -554,11 +557,11 @@
                 <input type="text" id="shop-cuit" class="form-input" placeholder="Sin guiones" required />
               </div>
               <div class="form-group">
-                <label class="form-label" for="shop-category">Rubro(s)</label>
-                <select id="shop-category" class="form-input" multiple required>
-                  <option value="">Cargando rubros...</option>
-                </select>
-                <small style="color: var(--bl-text-muted); display: block; margin-top: 0.25rem;">Mantené Ctrl (o Cmd en Mac) para elegir más de uno.</small>
+                <fieldset class="catpick">
+                  <legend class="form-label">Rubro(s)</legend>
+                  <small style="color: var(--bl-text-muted); display: block; margin-bottom: 0.25rem;">Podés elegir más de uno.</small>
+                  <div class="catpick__grid" id="shop-category-options"></div>
+                </fieldset>
               </div>
               <div class="form-group">
                 <label class="form-label" for="shop-address">Dirección del Local</label>
@@ -942,10 +945,14 @@
                       <label class="form-label" for="prod-name">Nombre del producto</label>
                       <input type="text" id="prod-name" class="form-input" required />
                     </div>
-                    <div class="form-group">
-                      <label class="form-label" for="prod-category">Categoría</label>
-                      <select id="prod-category" class="form-input" required></select>
-                    </div>
+                    <!-- Categoría: radios nativos estilados, no un <select>. Son 14
+                         opciones con ícono; verlas todas de una es más rápido que
+                         desplegar una lista, y el teclado, el required y el reset
+                         del formulario los sigue manejando el navegador. -->
+                    <fieldset class="form-group catpick">
+                      <legend class="form-label">Categoría</legend>
+                      <div class="catpick__grid" id="prod-category-options"></div>
+                    </fieldset>
                     <div class="form-group">
                       <label class="form-label" for="prod-desc">Descripción</label>
                       <textarea id="prod-desc" class="form-input" rows="4"></textarea>

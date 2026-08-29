@@ -10,8 +10,11 @@
   --bl-perfil-border: hsl(220, 14%, 86%);    /* Bordes sutiles */
   --bl-perfil-text-main: hsl(220, 14%, 22%); /* Texto oscuro elegante */
   --bl-perfil-text-sec: hsl(220, 10%, 56%);  /* Texto secundario */
-  --bl-perfil-primary: hsl(220, 72%, 46%);   /* Azul primario */
-  --bl-perfil-primary-hover: hsl(220, 75%, 38%);
+  /* Azul de marca (#284175). Antes esta página tenía un azul propio
+     (hsl(220,72%,46%)) que no coincidía con el resto del sitio — se unificó
+     al ancla de marca en el rediseño del hub. */
+  --bl-perfil-primary: var(--bl-primary, #284175);
+  --bl-perfil-primary-hover: var(--bl-primary-dark, #1f3460);
   
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
@@ -30,50 +33,63 @@ body {
 /* === Layout Principal === */
 .profile-container {
   width: 100%;
-  max-width: 1200px;
-  margin: 2rem auto;
+  max-width: 1100px;
+  margin: 2.5rem auto;
   padding: 0 1rem;
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 2rem;
-  align-items: start;
 }
 
 @media (max-width: 860px) {
   .profile-container {
-    grid-template-columns: 1fr; /* Apilado en móvil */
-    margin: 1rem auto;
-    gap: 1rem;
+    margin: 1.5rem auto;
   }
 }
 
-/* === Sidebar (Navegación) === */
-.profile-sidebar {
-  background: var(--bl-perfil-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  position: sticky;
-  top: 90px;
+/* === Encabezado (avatar + nombre + mail) === */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
 }
 
-.profile-sidebar__header {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--bl-perfil-border);
-  text-align: center;
+.profile-header__info {
+  min-width: 0;
+}
+
+.profile-header__name {
+  font-size: 1.375rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.profile-header__email {
+  font-size: 1rem;
+  color: var(--bl-perfil-text-sec);
+  margin: 0.35rem 0 0;
+}
+
+@media (max-width: 600px) {
+  .profile-header {
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+  }
+  .profile-header__name { font-size: 1.125rem; }
+  .profile-header__email { font-size: 0.875rem; }
 }
 
 .profile-avatar-large {
-  width: 64px;
-  height: 64px;
-  background: var(--bl-perfil-bg);
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  background: var(--bl-perfil-surface);
+  border: 1px solid var(--bl-perfil-border);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   color: var(--bl-perfil-text-sec);
-  margin: 0 auto 0.75rem;
   overflow: hidden;
 }
 
@@ -83,102 +99,121 @@ body {
   object-fit: cover;
 }
 
-.profile-sidebar__name {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin: 0;
-  line-height: 1.2;
+/* === Hub de la cuenta (grilla de secciones) === */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
 }
 
-.profile-sidebar__email {
-  font-size: 0.875rem;
-  color: var(--bl-perfil-text-sec);
-  margin-top: 0.25rem;
-}
-
-.profile-nav {
+.account-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 0;
-}
-
-.profile-nav__link {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  color: var(--bl-perfil-text-main);
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  min-height: 128px;
+  background: var(--bl-perfil-surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
   text-decoration: none;
-  font-weight: 500;
-  transition: background var(--duration-normal) var(--ease-spring), color var(--duration-normal) ease;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform var(--duration-normal) var(--ease-spring), box-shadow var(--duration-normal) var(--ease-spring), border-color var(--duration-normal) ease;
 }
 
-.profile-nav__link i {
+.account-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--bl-perfil-border);
+}
+
+.account-card:focus-visible {
+  outline: 2px solid var(--bl-perfil-primary);
+  outline-offset: 2px;
+}
+
+.account-card__icon {
+  font-size: 1.375rem;
+  color: var(--bl-perfil-text-main);
+  margin-bottom: 1.5rem;
+}
+
+.account-card__title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--bl-perfil-text-main);
+}
+
+.account-card__desc {
+  font-size: 0.875rem;
   color: var(--bl-perfil-text-sec);
-  font-size: 1.125rem;
-  width: 20px;
+  line-height: 1.4;
+}
+
+/* Puntito de aviso (notificaciones sin leer), como el "!" naranja de ML */
+.account-card__badge {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f27a1a;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 18px;
   text-align: center;
 }
 
-.profile-nav__link:hover {
-  background: var(--bl-perfil-bg);
-}
-
-.profile-nav__link--active {
-  color: var(--bl-perfil-primary);
-  border-left: 4px solid var(--bl-perfil-primary);
-  background: rgba(37, 99, 235, 0.05);
-}
-
-.profile-nav__link--active i {
-  color: var(--bl-perfil-primary);
-}
-
-.profile-nav__link--danger {
-  color: #ef4444;
-}
-.profile-nav__link--danger i {
-  color: #ef4444;
-}
-.profile-nav__link--danger:hover {
-  background: #fef2f2;
-}
-
-/* En móvil, el sidebar puede ser un menú horizontal scrolleable */
-@media (max-width: 860px) {
-  .profile-sidebar {
-    position: static;
-  }
-  .profile-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 0;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-  }
-  .profile-nav::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
-  }
-  .profile-nav__link {
-    flex-shrink: 0;
-    padding: 1rem;
-    border-left: none;
-    border-bottom: 3px solid transparent;
-  }
-  .profile-nav__link--active {
-    border-left: none;
-    border-bottom: 3px solid var(--bl-perfil-primary);
-  }
-  .profile-nav__link span {
-    display: none; /* Ocultar texto en móvil para ahorrar espacio, dejar íconos */
-  }
-}
-
-/* === Main Content (Bento Grid) === */
+/* === Sección abierta === */
 .profile-content {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+  display: block;
+}
+
+.section-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--bl-perfil-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.section-back:hover {
+  text-decoration: underline;
+}
+
+/* === Pie === */
+.profile-footer {
+  margin-top: 2.5rem;
+  font-size: 0.875rem;
+  color: var(--bl-perfil-text-sec);
+}
+
+.profile-footer__link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--bl-perfil-primary);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.profile-footer__link:hover {
+  text-decoration: underline;
 }
 
 /* Tarjeta genérica */
@@ -195,10 +230,6 @@ body {
   box-shadow: var(--shadow-md);
 }
 
-.perfil-card--full {
-  grid-column: 1 / -1; /* Ocupa todo el ancho */
-}
-
 .perfil-card__title {
   font-size: 1.25rem;
   font-weight: 600;
@@ -213,80 +244,14 @@ body {
   color: var(--bl-perfil-primary);
 }
 
-/* Lista de detalles */
-.detail-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
+/* Etiqueta de campo del formulario de direcciones. Las demás clases de la
+   vieja "lista de detalles" (.detail-list/.detail-item/.detail-value y el
+   .level-badge del rol) se borraron al rediseñar "Información de tu perfil":
+   esa pantalla era la única que las usaba. */
 .detail-label {
   font-size: 0.875rem;
   color: var(--bl-perfil-text-sec);
   font-weight: 500;
-}
-
-.detail-value {
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--bl-perfil-text-main);
-}
-
-/* Badge de Nivel/Rol */
-.level-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: linear-gradient(135deg, hsl(220, 80%, 56%), hsl(280, 70%, 58%));
-  color: white;
-  padding: 0.75rem 1.25rem;
-  border-radius: var(--radius-full);
-  font-weight: 600;
-  font-size: 1rem;
-  width: fit-content;
-}
-
-/* Accesos rápidos (cuadrícula interna) */
-.quick-access-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-}
-
-.quick-btn {
-  background: var(--bl-perfil-bg);
-  border: 1px solid var(--bl-perfil-border);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  text-decoration: none;
-  color: var(--bl-perfil-text-main);
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: all var(--duration-normal) var(--ease-spring);
-  cursor: pointer;
-}
-
-.quick-btn i {
-  font-size: 1.5rem;
-  color: var(--bl-perfil-primary);
-}
-
-.quick-btn:hover {
-  background: var(--bl-perfil-surface);
-  border-color: var(--bl-perfil-primary);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
 }
 
 /* === Skeleton Loading Animation === */
@@ -323,8 +288,13 @@ body {
   border-radius: 50%;
 }
 
-/* === Pestañas (Tabs) === */
+/* === Secciones (se muestra solo la abierta desde el hub) === */
 .tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
   animation: fadeIn var(--duration-normal) var(--ease-out);
 }
 
@@ -392,6 +362,19 @@ body {
   color: var(--bl-perfil-primary);
 }
 
+/* En un teléfono la tarjeta seguía siendo una fila fija: la info quedaba
+   apretada en media pantalla (el detalle del pedido cortado en dos líneas, el
+   selector de comprobante en ~190px) y el precio flotando al costado. */
+@media (max-width: 600px) {
+  .compra-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .compra-total { align-self: flex-start; }
+}
+
 .compra-items-list {
   list-style: none;
   padding: 0;
@@ -418,14 +401,131 @@ body {
   color: #991b1b;
 }
 
-.compra-proof__file {
-  font-size: 0.8125rem;
-}
-
 .compra-proof__btn {
   width: fit-content;
   padding: 0.5rem 1rem;
   font-size: 0.8125rem;
+}
+
+.compra-proof__btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Selector de comprobante ---
+   Reemplaza al <input type="file"> nativo, que no se puede estilar (cada
+   navegador dibuja su propio "Seleccionar archivo") y cortaba la estética de
+   la tarjeta. Mismo lenguaje que el dropzone del alta de producto --borde
+   punteado + ícono-- pero compacto: acá vive adentro de la tarjeta de un
+   pedido, no en un formulario entero. */
+.proof-drop {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px dashed var(--bl-perfil-border);
+  border-radius: var(--radius-md);
+  background: var(--bl-perfil-bg);
+  color: var(--bl-perfil-hint);
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: border-color var(--duration-normal) ease, background-color var(--duration-normal) ease;
+}
+
+.proof-drop:hover,
+.proof-drop.is-over {
+  border-color: var(--bl-perfil-primary);
+  background: rgba(40, 65, 117, 0.04);
+}
+
+.proof-drop:focus-visible {
+  outline: 2px solid var(--bl-perfil-primary);
+  outline-offset: 2px;
+}
+
+.proof-drop__icon {
+  font-size: 1.1rem;
+  color: var(--bl-perfil-primary);
+  flex-shrink: 0;
+}
+
+.proof-drop__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.proof-drop__main {
+  font-weight: 600;
+  color: var(--bl-perfil-text-main);
+}
+
+/* --- Archivo ya elegido --- */
+.proof-file {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--bl-perfil-border);
+  border-radius: var(--radius-md);
+  background: var(--bl-perfil-surface);
+  font-size: 0.8125rem;
+}
+
+.proof-file[hidden],
+.proof-drop[hidden] { display: none; }
+
+.proof-file__icon {
+  font-size: 1rem;
+  color: var(--bl-perfil-primary);
+  flex-shrink: 0;
+}
+
+/* El nombre se recorta, no empuja al botón de quitar fuera de la tarjeta. */
+.proof-file__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--bl-perfil-text-main);
+}
+
+.proof-file__size {
+  flex-shrink: 0;
+  color: var(--bl-perfil-hint);
+  font-variant-numeric: tabular-nums;
+}
+
+.proof-file__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--bl-perfil-hint);
+  cursor: pointer;
+  transition: background-color var(--duration-normal) ease, color var(--duration-normal) ease;
+}
+
+.proof-file__remove:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.proof-file__remove:focus-visible {
+  outline: 2px solid var(--bl-perfil-primary);
+  outline-offset: 2px;
 }
 
 /* === Botón de arrepentimiento (Ley 24.240 / Res. 424/2020) === */
@@ -445,6 +545,131 @@ body {
 .compra-revocation__btn:hover {
   background: var(--bl-perfil-border);
 }
+
+/* === Favoritos: buscador ===
+   Antes era un <input class="form-input"> pelado: esa clase solo existe inline
+   en vender.html y repartidor.html, así que en esta página no aplicaba nada y
+   se veía el input crudo del navegador. */
+.fav-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.875rem;
+}
+
+.fav-search__icon {
+  position: absolute;
+  left: 0.85rem;
+  font-size: 0.875rem;
+  color: var(--bl-perfil-hint);
+  pointer-events: none;
+}
+
+.fav-search__input {
+  width: 100%;
+  min-height: 44px;
+  /* Espacio a los costados para el ícono y el botón de borrar. */
+  padding: 0.6rem 2.6rem 0.6rem 2.4rem;
+  border: 1px solid var(--bl-perfil-border);
+  border-radius: var(--bl-radius-pill, 50rem);
+  background: var(--bl-perfil-surface);
+  font-family: inherit;
+  font-size: 1rem; /* 16px: evita el zoom automático de iOS */
+  color: var(--bl-perfil-text-main);
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
+}
+
+.fav-search__input::placeholder { color: var(--bl-perfil-hint); }
+
+.fav-search__input:focus {
+  outline: none;
+  border-color: var(--bl-perfil-primary);
+  box-shadow: 0 0 0 3px rgba(40, 65, 117, 0.12);
+}
+
+/* La "x" nativa de type=search la dibuja cada navegador a su manera; se usa
+   la propia, que además es un objetivo táctil de verdad. */
+.fav-search__input::-webkit-search-cancel-button { display: none; }
+
+.fav-search__clear {
+  position: absolute;
+  right: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--bl-perfil-hint);
+  cursor: pointer;
+  transition: background-color var(--duration-normal) ease, color var(--duration-normal) ease;
+}
+
+.fav-search__clear:hover {
+  background: var(--bl-perfil-bg);
+  color: var(--bl-perfil-text-main);
+}
+
+.fav-search__clear:focus-visible {
+  outline: 2px solid var(--bl-perfil-primary);
+  outline-offset: 2px;
+}
+
+.fav-search__clear[hidden] { display: none; }
+
+/* === Favoritos: filtro por categoría === */
+.fav-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.fav-chips:empty,
+.fav-chips[hidden] { display: none; }
+
+.fav-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--bl-perfil-border);
+  border-radius: var(--bl-radius-pill, 50rem);
+  background: var(--bl-perfil-surface);
+  color: var(--bl-perfil-text-main);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--duration-normal) ease, background-color var(--duration-normal) ease, color var(--duration-normal) ease;
+}
+
+.fav-chip:hover { border-color: var(--bl-perfil-primary); }
+
+.fav-chip:focus-visible {
+  outline: 2px solid var(--bl-perfil-primary);
+  outline-offset: 2px;
+}
+
+.fav-chip--active {
+  background: var(--bl-perfil-primary);
+  border-color: var(--bl-perfil-primary);
+  color: #fff;
+}
+
+/* El conteo se apoya en el color del chip, pero no depende solo de él: el
+   número está entre paréntesis, se lee igual sin distinguir el gris. */
+.fav-chip__count {
+  color: var(--bl-perfil-hint);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fav-chip--active .fav-chip__count { color: rgba(255, 255, 255, 0.75); }
 
 /* === Favoritos: sub-pestañas productos/comercios (P1-9) === */
 .fav-subtab-btn {
@@ -541,7 +766,7 @@ body {
 .bl-input:focus {
   outline: none;
   border-color: var(--bl-perfil-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(40, 65, 117, 0.12);
 }
 
 .bl-btn {
@@ -563,4 +788,401 @@ body {
 .bl-btn-primary:hover {
   background: var(--bl-perfil-primary-hover);
   transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   "Información de tu perfil" — lista de datos de la cuenta
+   ==========================================================================
+   Deliberadamente NO reusa .perfil-card: una tarjeta que flota al pasar el
+   mouse está bien para algo en lo que hacés click entero (las del hub), pero
+   acá cada fila tiene su propia acción — si el contenedor se mueve, el botón
+   "Editar" se te escapa del cursor. Lista quieta, con divisores, como la
+   pantalla de datos de cualquier tienda de verdad.
+
+   El texto secundario usa un gris más oscuro que --bl-perfil-text-sec: ese
+   llega a ~3.5:1 sobre blanco y las ayudas son texto que hay que poder leer
+   (AA pide 4.5:1). */
+:root {
+  --bl-perfil-hint: hsl(220, 12%, 42%);
+}
+
+.datos-intro {
+  margin-bottom: 2rem;
+}
+
+.datos-intro__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.datos-intro__lead {
+  margin: 0.5rem 0 0;
+  max-width: 58ch; /* medida de lectura cómoda */
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--bl-perfil-hint);
+}
+
+/* --- Aviso de perfil incompleto --- */
+.datos-nudge {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding: 1rem 1.125rem;
+  background: #fffaf0;
+  border: 1px solid #fde3b8;
+  border-radius: var(--radius-md);
+}
+
+.datos-nudge[hidden] { display: none; }
+
+.datos-nudge__icon {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  font-size: 1rem;
+  color: #b45309;
+}
+
+.datos-nudge__body { flex: 1; min-width: 0; }
+
+.datos-nudge__text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #7c4a03;
+}
+
+.datos-progress {
+  margin-top: 0.75rem;
+  height: 4px;
+  border-radius: 2px;
+  background: #fde3b8;
+  overflow: hidden;
+}
+
+.datos-progress__bar {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #d97706;
+  transition: width 400ms var(--ease-spring);
+}
+
+/* --- Grupos --- */
+.datos-group { margin-bottom: 2rem; }
+
+.datos-group__title {
+  margin: 0 0 0.625rem;
+  padding-left: 0.125rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--bl-perfil-hint);
+}
+
+.datos-panel {
+  background: var(--bl-perfil-surface);
+  border: 1px solid var(--bl-perfil-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* --- Fila --- */
+.datos-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.125rem 1.25rem;
+}
+
+/* Divisor entre filas hermanas, sin línea colgando al final. El
+   :not(:first-child) global cubre tanto las filas sueltas del HTML como las
+   que inyecta el JS dentro de .datos-panel__rows. */
+.datos-panel > .datos-row + .datos-row,
+.datos-panel > .datos-panel__rows > .datos-row,
+.datos-panel > .datos-panel__rows:not(:empty) {
+  border-top: 1px solid var(--bl-perfil-border);
+}
+
+.datos-panel > .datos-panel__rows > .datos-row:first-child {
+  border-top: none;
+}
+
+.datos-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.datos-row__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--bl-perfil-hint);
+}
+
+.datos-row__value {
+  font-size: 1rem;
+  color: var(--bl-perfil-text-main);
+  overflow-wrap: anywhere;
+}
+
+/* Un dato faltante se marca con texto, no solo con color: nadie que no
+   distinga el gris se queda sin enterarse. */
+.datos-row__value--empty {
+  color: var(--bl-perfil-hint);
+  font-style: italic;
+}
+
+.datos-row__hint {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--bl-perfil-hint);
+  max-width: 52ch;
+}
+
+.datos-row__error {
+  margin: 0.125rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #b91c1c;
+}
+
+.datos-row__error[hidden] { display: none; }
+
+/* --- Botones de la sección --- */
+.datos-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+  min-height: 44px; /* objetivo táctil mínimo */
+  padding: 0.5rem 0.875rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--bl-perfil-primary);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--duration-normal) ease, color var(--duration-normal) ease;
+}
+
+.datos-btn:hover { background: var(--bl-perfil-bg); }
+
+.datos-btn:focus-visible {
+  outline: 2px solid var(--bl-perfil-primary);
+  outline-offset: 2px;
+}
+
+.datos-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.datos-btn--quiet { color: var(--bl-perfil-hint); }
+
+.datos-btn--danger { color: #b91c1c; }
+.datos-btn--danger:hover { background: #fef2f2; }
+
+/* Única acción primaria visible a la vez: la de guardar la fila abierta. */
+.datos-btn--primary {
+  background: var(--bl-perfil-primary);
+  border-color: var(--bl-perfil-primary);
+  color: #fff;
+}
+
+.datos-btn--primary:hover { background: var(--bl-perfil-primary-hover); }
+
+/* --- Modo edición de una fila --- */
+.datos-row--editing { background: var(--bl-perfil-bg); }
+
+.datos-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.125rem;
+}
+
+.datos-input {
+  min-height: 44px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--bl-perfil-border);
+  border-radius: var(--radius-md);
+  background: var(--bl-perfil-surface);
+  font-family: inherit;
+  font-size: 1rem; /* 16px: evita el zoom automático de iOS */
+  color: var(--bl-perfil-text-main);
+  transition: border-color var(--duration-normal) ease, box-shadow var(--duration-normal) ease;
+}
+
+.datos-input:focus {
+  outline: none;
+  border-color: var(--bl-perfil-primary);
+  box-shadow: 0 0 0 3px rgba(40, 65, 117, 0.12);
+}
+
+.datos-input--grow { flex: 1; min-width: 12rem; }
+.datos-input--compact { min-width: 9rem; }
+
+.datos-input[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+.datos-input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+}
+
+.datos-row__actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* --- Etiqueta "Verificado" --- */
+.datos-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--bl-radius-pill, 50rem);
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.datos-tag[hidden] { display: none; }
+
+/* --- Foto --- */
+.datos-photo {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  padding: 1.25rem;
+}
+
+.datos-photo__frame {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--bl-perfil-border);
+  background: var(--bl-perfil-bg);
+  color: var(--bl-perfil-hint);
+  font-size: 1.5rem;
+  overflow: hidden;
+}
+
+.datos-photo__frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.datos-photo__body { flex: 1; min-width: 0; }
+
+.datos-photo__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--bl-perfil-hint);
+  max-width: 46ch;
+}
+
+.datos-photo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  margin-left: -0.875rem; /* alinea el texto del botón con la ayuda de arriba */
+}
+
+/* --- Privacidad: separada del resto a propósito (una acción destructiva no
+       vive al lado de "editar mi teléfono"). --- */
+.datos-group--privacy {
+  margin-top: 3rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--bl-perfil-border);
+}
+
+.datos-privacy__lead {
+  margin: 0 0 1rem;
+  max-width: 58ch;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--bl-perfil-hint);
+}
+
+.datos-privacy__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-left: -0.875rem;
+}
+
+/* Solo para lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Teléfono chico --- */
+@media (max-width: 600px) {
+  .datos-intro__title { font-size: 1.25rem; }
+
+  .datos-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.625rem;
+    padding: 1rem;
+  }
+
+  /* La acción baja debajo del dato y se alinea a la izquierda, en vez de
+     quedar apretada contra el borde derecho. */
+  .datos-row__actions,
+  .datos-row > .datos-btn {
+    align-self: flex-start;
+    margin-left: -0.875rem;
+  }
+
+  .datos-tag { align-self: flex-start; }
+
+  .datos-input--grow { min-width: 0; width: 100%; }
+
+  .datos-edit { flex-direction: column; align-items: stretch; }
+
+  .datos-photo {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  .datos-photo__actions { margin-left: -0.875rem; }
+}
+
+/* Respetar "reducir movimiento" del sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .datos-progress__bar { transition: none; }
 }

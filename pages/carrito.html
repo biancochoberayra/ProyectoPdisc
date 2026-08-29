@@ -127,11 +127,11 @@
                 <input type="radio" name="delivery-method" id="delivery-shipping" value="delivery" />
                 Envío a domicilio
               </label>
+              <!-- Direcciones guardadas: lista de opciones en vez de un <select>.
+                   Una dirección es un texto largo que el desplegable recorta, y
+                   acá se eligen de un toque. Las arma carrito.js. -->
+              <div class="addr-options" id="delivery-address-options" role="radiogroup" aria-label="Dirección de entrega" hidden></div>
               <input type="text" id="delivery-address" class="coupon-input" placeholder="Dirección de entrega" style="display: none; text-transform: none; margin-top: 0.5rem;" autocomplete="street-address" />
-              <select id="delivery-address-select" class="coupon-input" style="display: none; text-transform: none; margin-top: 0.5rem;">
-                <option value="">Elegí una dirección guardada...</option>
-                <option value="new">+ Usar una dirección nueva</option>
-              </select>
             </div>
           </div>
 

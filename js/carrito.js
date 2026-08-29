@@ -12,6 +12,15 @@ let currentDiscount = 0; // Porcentaje de descuento (0 a 1)
 let appliedCouponCode = null; // Código tal cual lo valida el servidor en create_order
 let deliveryMethod = 'pickup'; // 'pickup' | 'delivery' — ver initDeliveryEvents()
 let shippingAddress = '';
+/** Direcciones guardadas del usuario; vacío = se pide la dirección a mano. */
+let savedAddresses = [];
+/**
+ * Re-aplica la visibilidad del bloque de entrega. La define initDeliveryEvents;
+ * la llama loadAddressSelector al terminar, porque las direcciones llegan
+ * después y si el usuario ya había elegido "envío" seguiría viendo el campo
+ * libre en vez de sus direcciones guardadas.
+ */
+let refreshDeliveryUI = () => {};
 let paymentMethod = 'mercadopago'; // 'mercadopago' | 'transferencia' — ver initPaymentMethodEvents()
 
 // F12-04: fallback antes de que termine de cargar el envío real de cada
@@ -226,7 +235,7 @@ function initDeliveryEvents() {
   const pickupRadio = document.getElementById('delivery-pickup');
   const shippingRadio = document.getElementById('delivery-shipping');
   const addressInput = document.getElementById('delivery-address');
-  const addressSelect = document.getElementById('delivery-address-select');
+  const addressOptions = document.getElementById('delivery-address-options');
   const shippingLabel = document.getElementById('summary-shipping-label');
 
   if (!header || !content || !pickupRadio || !shippingRadio || !addressInput) return;
@@ -239,18 +248,18 @@ function initDeliveryEvents() {
 
   function updateMethod() {
     deliveryMethod = shippingRadio.checked ? 'delivery' : 'pickup';
-    // Si hay direcciones guardadas, mostrar el selector; si no, el input libre.
-    const hasSelect = addressSelect && addressSelect.options.length > 2;
+    // Con direcciones guardadas se muestra la lista; sin ellas, el campo libre.
+    const hayGuardadas = savedAddresses.length > 0;
     if (deliveryMethod === 'delivery') {
-      if (hasSelect) {
-        addressSelect.style.display = 'block';
-        addressInput.style.display = addressSelect.value === 'new' ? 'block' : 'none';
+      if (hayGuardadas) {
+        if (addressOptions) addressOptions.hidden = false;
+        addressInput.style.display = getSelectedAddressValue() === 'new' ? 'block' : 'none';
       } else {
         addressInput.style.display = 'block';
       }
     } else {
       addressInput.style.display = 'none';
-      if (addressSelect) addressSelect.style.display = 'none';
+      if (addressOptions) addressOptions.hidden = true;
     }
     if (shippingLabel) {
       shippingLabel.textContent = deliveryMethod === 'delivery'
@@ -260,37 +269,44 @@ function initDeliveryEvents() {
     renderCart();
   }
 
+  refreshDeliveryUI = updateMethod;
   pickupRadio.addEventListener('change', updateMethod);
   shippingRadio.addEventListener('change', updateMethod);
   addressInput.addEventListener('input', () => {
     shippingAddress = addressInput.value.trim();
   });
 
-  if (addressSelect) {
-    addressSelect.addEventListener('change', () => {
-      if (addressSelect.value === 'new') {
-        addressInput.style.display = 'block';
-        addressInput.value = '';
-        shippingAddress = '';
-        addressInput.focus();
-      } else if (addressSelect.value) {
-        addressInput.style.display = 'none';
-        shippingAddress = addressSelect.value;
-      } else {
-        shippingAddress = '';
-      }
-    });
-  }
+  // Delegado: las opciones las inyecta loadAddressSelector() después, así que
+  // engancharse a cada radio acá llegaría antes de que existan.
+  addressOptions?.addEventListener('change', () => {
+    const elegida = getSelectedAddressValue();
+    if (elegida === 'new') {
+      addressInput.style.display = 'block';
+      addressInput.value = '';
+      shippingAddress = '';
+      addressInput.focus();
+    } else if (elegida) {
+      addressInput.style.display = 'none';
+      shippingAddress = elegida;
+    } else {
+      shippingAddress = '';
+    }
+  });
+}
+
+/** Valor del radio de dirección elegido ('' si ninguno, 'new' si es una nueva). */
+function getSelectedAddressValue() {
+  return document.querySelector('input[name="delivery-address-choice"]:checked')?.value || '';
 }
 
 /**
- * P0-2: carga las direcciones guardadas del usuario y popula el <select>.
- * Si no hay direcciones, el selector queda con solo las 2 opciones default
- * y el input libre se muestra directamente al elegir envío.
+ * P0-2: carga las direcciones guardadas del usuario y arma la lista de
+ * opciones. Sin direcciones no se dibuja nada y al elegir envío se muestra
+ * directamente el campo libre.
  */
 async function loadAddressSelector() {
-  const addressSelect = document.getElementById('delivery-address-select');
-  if (!addressSelect) return;
+  const container = document.getElementById('delivery-address-options');
+  if (!container) return;
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
@@ -304,23 +320,63 @@ async function loadAddressSelector() {
 
   if (!addresses || addresses.length === 0) return;
 
-  // Limpiar opciones previas (conservar las 2 default)
-  while (addressSelect.options.length > 2) {
-    addressSelect.remove(1);
-  }
+  savedAddresses = addresses;
+  container.textContent = '';
 
   addresses.forEach((addr) => {
-    const opt = document.createElement('option');
     const fullAddr = addr.details ? `${addr.address} — ${addr.details}` : addr.address;
-    opt.value = fullAddr;
-    opt.textContent = `${addr.label}: ${fullAddr}`;
-    if (addr.is_default) {
-      opt.selected = true;
-      shippingAddress = fullAddr;
-    }
-    // Insertar antes de "Usar una dirección nueva"
-    addressSelect.insertBefore(opt, addressSelect.options[addressSelect.options.length - 1]);
+    container.appendChild(buildAddressOption({
+      value: fullAddr,
+      label: addr.label,
+      texto: fullAddr,
+      predeterminada: addr.is_default,
+      elegida: addr.is_default,
+    }));
+    if (addr.is_default) shippingAddress = fullAddr;
   });
+
+  container.appendChild(buildAddressOption({
+    value: 'new',
+    label: 'Usar otra dirección',
+    texto: 'Escribís una dirección distinta para este pedido.',
+  }));
+
+  refreshDeliveryUI();
+}
+
+/** Una opción de dirección (radio visible + etiqueta y texto). */
+function buildAddressOption({ value, label, texto, predeterminada = false, elegida = false }) {
+  const wrap = document.createElement('label');
+  wrap.className = 'addr-option';
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = 'delivery-address-choice';
+  radio.value = value;
+  radio.checked = elegida;
+  wrap.appendChild(radio);
+
+  const body = document.createElement('div');
+  body.className = 'addr-option__body';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'addr-option__label';
+  labelEl.textContent = label;
+  if (predeterminada) {
+    const tag = document.createElement('span');
+    tag.className = 'addr-option__tag';
+    tag.textContent = 'Predeterminada';
+    labelEl.appendChild(tag);
+  }
+  body.appendChild(labelEl);
+
+  const textEl = document.createElement('span');
+  textEl.className = 'addr-option__text';
+  textEl.textContent = texto;
+  body.appendChild(textEl);
+
+  wrap.appendChild(body);
+  return wrap;
 }
 
 /**

@@ -115,16 +115,15 @@
             </div>
 
             <div class="filter-group">
-              <label for="filter-sort" class="filter-group__title">Ordenar por</label>
-              <div class="filter-select-wrapper">
-                <select class="filter-select" id="filter-sort">
-                  <option value="relevancia">Más relevantes</option>
-                  <option value="precio-asc">Menor precio</option>
-                  <option value="precio-desc">Mayor precio</option>
-                  <option value="recientes">Más recientes</option>
-                  <option value="nombre">Nombre (A-Z)</option>
-                </select>
-                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+              <h4 class="filter-group__title" id="sort-group-label">Ordenar por</h4>
+              <!-- Mismo desplegable propio que el de Categoría, en vez de un
+                   <select> nativo. Las opciones las pone search.js. -->
+              <div class="cat-filter-dropdown" id="filter-sort">
+                <button type="button" class="cat-filter-dropdown__trigger" id="sort-filter-trigger" aria-haspopup="true" aria-expanded="false" aria-labelledby="sort-group-label">
+                  <span id="sort-filter-label">Más relevantes</span>
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="cat-filter-dropdown__menu" id="sort-filter-menu" role="listbox" hidden></div>
               </div>
             </div>
 
@@ -136,6 +135,14 @@
               <span class="catalog-count" id="catalog-count"></span>
             </div>
             <div class="active-filters" id="active-filters"></div>
+
+            <!-- Comercios que coinciden con la búsqueda. Van arriba de los
+                 productos: si alguien escribe el nombre de un comercio, lo que
+                 busca es el comercio. Lo llena search.js. -->
+            <section class="store-results" id="store-results" hidden>
+              <h3 class="store-results__title" id="store-results-title">Comercios</h3>
+              <div class="products__grid" id="stores-grid"></div>
+            </section>
 
             <div class="products__grid" id="products-grid">
 
@@ -217,7 +224,7 @@
             <a href="./info.html" class="footer__link">Contacto</a>
             <a href="./info.html" class="footer__link">Preguntas frecuentes</a>
             <a href="./info.html" class="footer__link">Devoluciones</a>
-            <a href="./info.html" class="footer__link">Términos</a>
+            <a href="./terminos.html" class="footer__link">Términos</a>
           </nav>
         </div>
       </div>
